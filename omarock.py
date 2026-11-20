@@ -107,6 +107,11 @@ class Robot:
                     result['maps']=[{'id':m.get('mapFlag'),'name':m.get('name', 'Floor'), 'rooms':[{'id':r['id'],'name':r.get('iotName') or 'Room '+str(r['id'])} for r in m.get('rooms',[])]} for m in raw.get('mapInfo',[])]
                 elif label=='consumables':
                     result['consumables']={k:(round(max(0,getattr(trait,k+'_time_left'))/3600,1) if getattr(trait,k+'_time_left',None) is not None else None) for k in ['main_brush','side_brush','filter','sensor']}
+                    import maintenance
+                    from roborock.data import Consumable
+                    constants=Consumable.main_brush_time_left.fget.__globals__
+                    lifetimes={'main_brush':'MAIN_BRUSH_REPLACE_TIME','side_brush':'SIDE_BRUSH_REPLACE_TIME','filter':'FILTER_REPLACE_TIME','sensor':'SENSOR_DIRTY_REPLACE_TIME'}
+                    result['maintenance']={k:{'percent':maintenance.percentage(getattr(trait,k+'_time_left',None),constants[c]),'supported':getattr(trait,maintenance.FIELDS[k],None) is not None} for k,c in lifetimes.items()}
                 else:
                     result['totalRuns']=trait.clean_count
                     result['history']=[]
@@ -207,6 +212,17 @@ class Robot:
     async def execute(self, action, plan=None):
         if self.config.get('allow_control') is not True: raise ValueError('Control locked. Explicitly enable allow_control in your private config after supervised testing')
         await self.v.status.refresh()
+        if action=='reset-consumable':
+            import maintenance
+            from roborock.devices.traits.v1.consumeable import ConsumableAttribute
+            key=maintenance.validate_reset(plan)
+            await self.v.consumables.refresh()
+            if getattr(self.v.consumables,maintenance.FIELDS[key],None) is None:
+                raise ValueError('Consumable unsupported or unavailable')
+            if self.v.status.in_cleaning or self.v.status.in_returning:
+                raise ValueError('Robot busy')
+            await self.v.consumables.reset_consumable(ConsumableAttribute.from_str(maintenance.FIELDS[key]))
+            return 'Usage reset submitted; refresh to verify'
         if action in ('pause','dock'):
             return await self.v.command.send('app_pause' if action=='pause' else 'app_charge')
         if action!='clean': raise ValueError('Unknown action')

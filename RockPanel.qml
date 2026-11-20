@@ -68,7 +68,7 @@ Ui.Panel {
     }
     function submit() {
         if(!pending || !writable)return
-        if(pending.plan){if(!confirmedFloor)return;pending.plan.confirmedFloor=floor}
+        if(pending.action==="clean" && pending.plan){if(!confirmedFloor)return;pending.plan.confirmedFloor=floor}
         pending.confirmed=true
         action.command=[python,base+"/omarock.py","action","--request",JSON.stringify(pending)]
         action.running=true
@@ -292,9 +292,15 @@ Ui.Panel {
                         Text {text:"A little care.";color:Color.foreground;font.family:Style.font.family;font.pixelSize:22}
                         Repeater {model:[{key:"main_brush",name:"Main brush"},{key:"side_brush",name:"Side brush"},{key:"filter",name:"Filter"},{key:"sensor",name:"Sensors"}];Rectangle {
                             required property var modelData
-                            width:body.width;height:65;radius:5;color:Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.045)
+                            width:body.width;height:100;radius:5;color:Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.045)
                             Text {anchors{left:parent.left;verticalCenter:parent.verticalCenter;leftMargin:14} text:modelData.name;color:Color.foreground;font.family:Style.font.family;font.pixelSize:13}
-                            Text {anchors{right:parent.right;verticalCenter:parent.verticalCenter;rightMargin:14} text:root.report.consumables && root.report.consumables[modelData.key]!==null?root.report.consumables[modelData.key]+" h remaining":"Unknown";color:Color.accent;font.family:Style.font.family;font.pixelSize:13}
+                            Text {anchors{right:parent.right;verticalCenter:parent.verticalCenter;rightMargin:14} text:root.report.consumables && root.report.consumables[modelData.key]!==undefined && root.report.consumables[modelData.key]!==null?root.report.consumables[modelData.key]+" h remaining"+(root.report.maintenance && root.report.maintenance[modelData.key] && root.report.maintenance[modelData.key].percent!==null?" · "+root.report.maintenance[modelData.key].percent+"%":""):"Unknown";color:Color.accent;font.family:Style.font.family;font.pixelSize:13}
+                            RockButton {
+                                anchors {left:parent.left;bottom:parent.bottom;margins:12}
+                                text:"Reset after "+(modelData.key==="sensor"?"cleaning":"replacement")+"…"
+                                available:!!root.report.maintenance && !!root.report.maintenance[modelData.key] && root.report.maintenance[modelData.key].supported
+                                onClicked:{root.pending={action:"reset-consumable",plan:{consumable:modelData.key,afterReplacement:true}};root.actionMessage="Only confirm after actual replacement or sensor cleaning. This resets usage, not physical condition."}
+                            }
                         }}
                         Text {text:"Library estimates based on usage—not physical condition sensors.";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
                     }
@@ -337,10 +343,10 @@ Ui.Panel {
                             id:reviewBody
                             anchors{left:parent.left;right:parent.right;top:parent.top;margins:14}
                             spacing:12
-                            Text {text:root.pending && root.pending.plan?"Review: "+root.current.name+" · "+["Rooms","Whole floor","Zone"][root.scope]+" · "+["Vacuum","Vacuum & mop","Mop"][root.mode]:"Confirm: "+(root.pending?root.pending.action:"");color:Color.foreground;font.family:Style.font.family;font.pixelSize:14}
-                            RockButton {visible:!!root.pending && !!root.pending.plan;text:(root.confirmedFloor?"✓ ":"□ ")+"Robot is physically on "+root.current.name;selected:root.confirmedFloor;onClicked:root.confirmedFloor=!root.confirmedFloor}
+                            Text {text:root.pending && root.pending.action==="clean"?"Review: "+root.current.name+" · "+["Rooms","Whole floor","Zone"][root.scope]+" · "+["Vacuum","Vacuum & mop","Mop"][root.mode]:"Confirm: "+(root.pending?root.pending.action+(root.pending.action==="reset-consumable"?" · "+root.pending.plan.consumable+" · I have replaced/cleaned this part":""):"");color:Color.foreground;font.family:Style.font.family;font.pixelSize:14}
+                            RockButton {visible:!!root.pending && root.pending.action==="clean";text:(root.confirmedFloor?"✓ ":"□ ")+"Robot is physically on "+root.current.name;selected:root.confirmedFloor;onClicked:root.confirmedFloor=!root.confirmedFloor}
                             Text {text:root.pending && root.pending.action==="import-maps"?"While idle: briefly select each saved map, cache its image, then restore the original selection. No cleaning.":root.writable?"This will operate your robot. Supervise the first test.":"Safety lock or stale state: preview only. No device command can be sent.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11}
-                            Row {spacing:10;RockButton {text:"Cancel";onClicked:root.pending=null} RockButton {text:root.pending && root.pending.action==="import-maps"?"Import maps":action.running?"Sending…":"Send to robot";primary:true;available:root.pending && root.pending.action==="import-maps"?!root.fetching && !root.importing:root.writable && (!root.pending || !root.pending.plan || root.confirmedFloor);onClicked:{if(root.pending.action==="import-maps"){root.pending=null;root.actionMessage="Importing saved floors…";importer.running=true}else root.submit()}}}
+                            Row {spacing:10;RockButton {text:"Cancel";onClicked:root.pending=null} RockButton {text:root.pending && root.pending.action==="import-maps"?"Import maps":action.running?"Sending…":"Send to robot";primary:true;available:root.pending && root.pending.action==="import-maps"?!root.fetching && !root.importing:root.writable && (!root.pending || root.pending.action!=="clean" || root.confirmedFloor);onClicked:{if(root.pending.action==="import-maps"){root.pending=null;root.actionMessage="Importing saved floors…";importer.running=true}else root.submit()}}}
                         }
                     }
                     Text {width:parent.width;text:root.actionMessage;visible:text!=="";color:Color.accent;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
