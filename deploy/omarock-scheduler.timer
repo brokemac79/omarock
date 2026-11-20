@@ -1,0 +1,9 @@
+[Unit]
+Description=Check OmaRock cleaning schedules each minute
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+Persistent=false
+Unit=omarock-scheduler.service
+[Install]
+WantedBy=timers.target

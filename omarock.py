@@ -352,7 +352,7 @@ def main():
             elif args.command=='delete-schedule':
                 schedules.pop(request.get('id'),None)
                 save(STATE/'schedules.json',schedules)
-            result={'schedules':[dict(v,id=k) for k,v in schedules.items()],'controlsEnabled':load(CONFIG/'config.json',{}).get('allow_control') is True}
+            result={'schedules':[dict(v,id=k) for k,v in schedules.items()],'controlsEnabled':load(CONFIG/'config.json',{}).get('allow_control') is True,'outcomes':list(load(STATE/'schedule-journal.json',{}).values())[-10:]}
         elif args.command=='scheduler-tick':
             import scheduler
             journal=load(STATE/'schedule-journal.json',{})

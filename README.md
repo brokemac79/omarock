@@ -70,3 +70,23 @@ last-clean dates therefore remain unknown. Existing floor activity remains under
 History. A future scheduler needs explicit commissioning, sleep/offline recovery,
 physical-floor availability and reliable completion tracking before automation
 can be enabled. Local plans are private (`~/.local/state/omarock/plans.json`).
+
+
+### Timed desktop schedules
+Schedules is separate from local Timeline reminders. Choose floor/room, vacuum
+or mop, time and weekdays. Timezone is Europe/London including GMT/BST. Disabled
+jobs can be saved before commissioning. Enabling requires explicit physical-floor
+confirmation and the existing private allow_control safety gate; this release
+does not unlock untested cleaning controls.
+
+The systemd user timer in deploy checks once per minute. Surface must be awake,
+signed in and online: these are **not Roborock cloud/device timers**. Missed jobs
+are skipped (no surprise catch-up). No map switching. Current map, battery, errors
+and busy status are checked again before dispatch. Keeping the robot physically
+on the correct floor remains the user's responsibility; map selection alone
+cannot establish its physical location. Attempt reservations survive restarts;
+uncertain outcomes are never automatically retried. Outcomes appear in Schedules.
+Other due jobs may be skipped if the robot is busy: no cleaning queue is implied.
+
+No live scheduled cleaning has been commissioned/tested yet. Automated starts
+remain locked. Use the official Roborock app for commissioned device schedules.
