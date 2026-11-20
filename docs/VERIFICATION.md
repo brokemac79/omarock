@@ -18,3 +18,6 @@ The first browser-based implementation was rejected by Martin. It is superseded 
 - Saros physical room/floor/zone cleaning, mode setting and pause/dock. Default lock remains on.
 - Other-floor image retrieval; historical per-room coverage when room IDs are absent.
 - Marketplace packaging/submission. Repository remains private.
+
+## Standalone app clarification (17:48 UTC)
+Martin requested the full mockup as its own app, not an attached bar popup. RockPanel now contains a compositor-managed native FloatingWindow with a sidebar. Both launcher and bar open/focus this window. Verified Hyprland client title OmaRock (class org.quickshell), own workspace, close removes the client, launcher reopens it, and launching from another workspace focuses the existing window. Keyboard view switching and actual cached map rendering visually checked. No OmaRock runtime errors in final shell log; 18 tests pass. Narrow tiled windows preserve minimum content width with scrolling. No browser, WebView, external listening service, or robot actuation.
