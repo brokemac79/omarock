@@ -34,6 +34,7 @@ Ui.Panel {
     readonly property bool writable: report.controlsEnabled===true && !stale && !fetching && !action.running
     readonly property color muted: Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.6)
     signal refreshRequested()
+    onPendingChanged: { if(pending)Qt.callLater(function(){scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)}) }
     onReportChanged: { if(floor===-1 && report.activeFloor!==undefined)floor=report.activeFloor }
     function label(s) { return String(s===undefined || s===null ? "unknown" : s).replace(/_/g," ") }
     function chooseFloor(id) {floor=id;selected=[];zones=[];draft=null;mapCanvas.requestPaint()}
@@ -86,6 +87,7 @@ Ui.Panel {
             onCloseRequested: {if(root.pending)root.pending=null;else root.close()}
             onTextKey: function(t){if(t==="r")root.refreshRequested()}
             Flickable {
+                id: scroller
                 anchors.fill: parent
                 contentWidth: width
                 contentHeight: body.implicitHeight
@@ -226,7 +228,7 @@ Ui.Panel {
                                 }
                                 Text {width:parent.width;text:root.scope===0?root.selected.length+" room(s) selected":root.scope===1?"Whole "+root.current.name:root.zones.length+" zone(s) · drag on map";color:root.muted;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap}
                                 RockButton {width:parent.width;text:"Review cleaning request →";primary:true;available:root.activeFloor;onClicked:root.review()}
-                                Row {spacing:8;RockButton {text:"Ⅱ Pause";onClicked:{root.pending={action:"pause"};root.actionMessage=""}};RockButton {text:"⌂ Dock";onClicked:{root.pending={action:"dock"};root.actionMessage=""}}}
+                                Row {spacing:8;RockButton {text:"Ⅱ Pause";onClicked:{root.pending={action:"pause"};root.actionMessage=""}} RockButton {text:"⌂ Dock";onClicked:{root.pending={action:"dock"};root.actionMessage=""}}}
                                 Text {width:parent.width;text:root.report.controlsEnabled?"Supervise first cleaning tests.":"Controls locked. Preview only; no commands sent.";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                             }
                         }
@@ -245,7 +247,7 @@ Ui.Panel {
                                 height:75
                                 radius:5
                                 color:Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.045)
-                                Column {anchors{left:parent.left;verticalCenter:parent.verticalCenter;leftMargin:14};spacing:7
+                                Column {anchors{left:parent.left;verticalCenter:parent.verticalCenter;leftMargin:14} spacing:7
                                     Text {text:root.floorName(modelData.map_flag)+" · "+root.date(modelData.begin);color:Color.foreground;font.family:Style.font.family;font.pixelSize:12}
                                     Text {text:(modelData.area/1000000).toFixed(1)+" m² · "+Math.round(modelData.duration/60)+" min · "+(modelData.complete===1?"Complete":"Completion unconfirmed")+" · Rooms "+((modelData.area_ids||[]).length?modelData.area_ids.join(", "):"unknown");color:root.muted;font.family:Style.font.family;font.pixelSize:10}
                                 }
@@ -260,8 +262,8 @@ Ui.Panel {
                         Repeater {model:[{key:"main_brush",name:"Main brush"},{key:"side_brush",name:"Side brush"},{key:"filter",name:"Filter"},{key:"sensor",name:"Sensors"}];Rectangle {
                             required property var modelData
                             width:body.width;height:65;radius:5;color:Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.045)
-                            Text {anchors{left:parent.left;verticalCenter:parent.verticalCenter;leftMargin:14};text:modelData.name;color:Color.foreground;font.family:Style.font.family;font.pixelSize:13}
-                            Text {anchors{right:parent.right;verticalCenter:parent.verticalCenter;rightMargin:14};text:root.report.consumables && root.report.consumables[modelData.key]!==null?root.report.consumables[modelData.key]+" h remaining":"Unknown";color:Color.accent;font.family:Style.font.family;font.pixelSize:13}
+                            Text {anchors{left:parent.left;verticalCenter:parent.verticalCenter;leftMargin:14} text:modelData.name;color:Color.foreground;font.family:Style.font.family;font.pixelSize:13}
+                            Text {anchors{right:parent.right;verticalCenter:parent.verticalCenter;rightMargin:14} text:root.report.consumables && root.report.consumables[modelData.key]!==null?root.report.consumables[modelData.key]+" h remaining":"Unknown";color:Color.accent;font.family:Style.font.family;font.pixelSize:13}
                         }}
                         Text {text:"Library estimates based on usage—not physical condition sensors.";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
                     }
@@ -288,7 +290,7 @@ Ui.Panel {
                             Text {text:root.pending && root.pending.plan?"Review: "+root.current.name+" · "+["Rooms","Whole floor","Zone"][root.scope]+" · "+["Vacuum","Vacuum & mop","Mop"][root.mode]:"Confirm: "+(root.pending?root.pending.action:"");color:Color.foreground;font.family:Style.font.family;font.pixelSize:14}
                             RockButton {visible:!!root.pending && !!root.pending.plan;text:(root.confirmedFloor?"✓ ":"□ ")+"Robot is physically on "+root.current.name;selected:root.confirmedFloor;onClicked:root.confirmedFloor=!root.confirmedFloor}
                             Text {text:root.writable?"This will operate your robot. Supervise the first test.":"Safety lock or stale state: preview only. No device command can be sent.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11}
-                            Row {spacing:10;RockButton {text:"Cancel";onClicked:root.pending=null};RockButton {text:action.running?"Sending…":"Send to robot";primary:true;available:root.writable && (!root.pending || !root.pending.plan || root.confirmedFloor);onClicked:root.submit()}}
+                            Row {spacing:10;RockButton {text:"Cancel";onClicked:root.pending=null} RockButton {text:action.running?"Sending…":"Send to robot";primary:true;available:root.writable && (!root.pending || !root.pending.plan || root.confirmedFloor);onClicked:root.submit()}}
                         }
                     }
                     Text {width:parent.width;text:root.actionMessage;visible:text!=="";color:Color.accent;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
