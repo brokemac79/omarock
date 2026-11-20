@@ -21,6 +21,7 @@ uv venv --python 3.12 ~/.local/share/omarock/venv
 uv pip install --python ~/.local/share/omarock/venv/bin/python 'python-roborock[cli]==7.23.2'
 ~/.local/share/omarock/venv/bin/roborock login --email YOUR_EMAIL
 omarchy plugin enable io.github.brokemac79.omarock
+cp ~/.config/omarchy/plugins/io.github.brokemac79.omarock/omarock.desktop ~/.local/share/applications/
 ```
 
 Private repo access needs GitHub authentication. Click the robot bar icon to open the native panel. Middle-click or press R in the panel to refresh; Escape closes the review or panel. The Python environment MUST live outside the plugin tree (Omarchy disallows internal symlinks). No auto-start daemon or listening port is installed.
@@ -39,7 +40,7 @@ A request is **submitted**, never assumed complete. Mode setting and starting ar
 
 ## Honest limitations
 
-Only the active floor’s image is available; other saved floor names/rooms can be browsed without pretending their image is current. History may omit room IDs. No fabricated last-cleaned room dates or freshness layer. Maps use real robot-rendered data, not the illustrative furniture from the design concept. Full native standalone desktop window/launcher can be added later; v0.1 is a native Omarchy bar plugin and attached panel.
+Only the active floor’s image is available; other saved floor names/rooms can be browsed without pretending their image is current. History may omit room IDs. No fabricated last-cleaned room dates or freshness layer. Maps use real robot-rendered data, not the illustrative furniture from the design concept. The app launcher and bar open the same native Omarchy panel, not an independent browser or WebView. A separate resizable native window can be added later.
 
 ## Development
 
