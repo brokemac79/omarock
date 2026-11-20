@@ -115,7 +115,7 @@ Ui.Panel {
                         Text {
                             id: warning
                             anchors{left:parent.left;right:parent.right;verticalCenter:parent.verticalCenter;leftMargin:12;rightMargin:12}
-                            text: !root.report.authPresent ? "Desktop sign-in needed. Showing a timestamped snapshot only; no live connection yet." : root.lastError ? root.lastError : root.stale ? "Cached data is stale. Refresh before relying on robot state." : !root.report.controlsEnabled ? "Read-only safety lock · cleaning controls await supervised commissioning." : "Live connection · review every request before sending."
+                            text: root.lastError ? root.lastError : !root.report.authPresent ? "Desktop sign-in needed. Showing a timestamped snapshot only; no live connection yet." : root.lastError ? root.lastError : root.stale ? "Cached data is stale. Refresh before relying on robot state." : !root.report.controlsEnabled ? "Read-only safety lock · cleaning controls await supervised commissioning." : "Live connection · review every request before sending."
                             wrapMode: Text.WordWrap
                             color: Color.accent
                             font.family: Style.font.family

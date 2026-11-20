@@ -24,7 +24,7 @@ Ui.BarWidget {
     function refresh() { if(!fetcher.running && report.authPresent) fetcher.running=true; else if(!reader.running) reader.running=true }
     Process {
         id: reader
-        command: ["python3",root.base+"/omarock.py","cached"]
+        command: ["/usr/bin/python3",root.base+"/omarock.py","cached"]
         stdout: StdioCollector { onStreamFinished: { try { var r=JSON.parse(text); if(!r.error)root.report=r;else root.lastError=r.error } catch(e) { root.lastError="Cannot read cached status" } } }
     }
     Process {

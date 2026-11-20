@@ -91,7 +91,7 @@ class Robot:
         await self.v.status.refresh()
         s=self.v.status
         result={'at':now(),'name':self.name,'demo':False,'battery':s.battery,'state':enum_name(s.state),
-                'activeFloor':s.current_map,'error':enum_name(s.error_code),'dockError':enum_name(s.dock_error_status),
+                'activeFloor':s.current_map,'robotError':enum_name(s.error_code),'dockError':enum_name(s.dock_error_status),
                 'cleanWater':enum_name(s.clear_water_box_status),'dirtyWater':enum_name(s.dirty_water_box_status),
                 'washing':s.wash_status,'drying':s.dry_status,'drySeconds':s.rdt,
                 'mode':s.current_cleaning_mode_name,'controlsEnabled':self.config.get('allow_control') is True,
@@ -193,6 +193,7 @@ def main():
             result={'status':'submitted; completion unverified', 'result':str(asyncio.run(perform(request.get('action'),plan=request.get('plan'))))[:200]}
         else:
             result=load(STATE/'snapshot.json',{})
+            if 'error' in result: result['robotError']=result.pop('error')
             result['authPresent']=(Path.home()/'.roborock').exists()
             if args.command=='bar':result={k:result.get(k) for k in ['at','name','battery','state','cleanWater','dirtyWater']}
         print(json.dumps(result))
