@@ -110,6 +110,11 @@ Ui.Panel {
             focus: true
             Keys.onPressed: function(event) {
                 if(event.key===Qt.Key_Escape) { if(root.pending)root.pending=null;else root.close();event.accepted=true }
+                else if(root.tab===0 && (event.key===Qt.Key_Plus || event.key===Qt.Key_Equal)) {mapViewport.zoom=Math.min(5,mapViewport.zoom*1.25);event.accepted=true}
+                else if(root.tab===0 && event.key===Qt.Key_Minus) {mapViewport.zoom=Math.max(1,mapViewport.zoom/1.25);event.accepted=true}
+                else if(root.tab===0 && event.key===Qt.Key_F) {mapViewport.fit();event.accepted=true}
+                else if(root.tab===0 && event.key===Qt.Key_B) {mapViewport.centreRobot();event.accepted=true}
+                else if(root.tab===0 && event.modifiers & Qt.ControlModifier && [Qt.Key_Left,Qt.Key_Right,Qt.Key_Up,Qt.Key_Down].indexOf(event.key)>=0) {mapViewport.panX+=event.key===Qt.Key_Left?-30:event.key===Qt.Key_Right?30:0;mapViewport.panY+=event.key===Qt.Key_Up?-30:event.key===Qt.Key_Down?30:0;event.accepted=true}
                 else if(event.key===Qt.Key_End) {scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height);event.accepted=true}
                 else if(event.key===Qt.Key_Home) {scroller.contentY=0;event.accepted=true}
                 else if(event.key===Qt.Key_Right) {root.tab=(root.tab+1)%6;event.accepted=true}
@@ -312,10 +317,10 @@ Ui.Panel {
                                     width:parent.width;spacing:6
                                     RockButton {text:"−";onClicked:mapViewport.zoom=Math.max(1,mapViewport.zoom/1.25)}
                                     RockButton {text:"+";onClicked:mapViewport.zoom=Math.min(5,mapViewport.zoom*1.25)}
-                                    RockButton {text:"Fit";onClicked:mapViewport.fit()}
+                                    RockButton {text:"Fit · "+Math.round(mapViewport.zoom*100)+"%";onClicked:mapViewport.fit()}
                                     RockButton {text:"Centre robot";available:!!(root.floorMap.layers||{}).robot;onClicked:mapViewport.centreRobot()}
                                 }
-                                Text {width:parent.width;text:"Wheel / pinch to zoom · right-drag to pan · tap room labels to select · left-drag draws zones in Zone mode";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                                Text {width:parent.width;text:"+/− or wheel/pinch: zoom · F: fit · B: robot · Ctrl+arrows/right-drag: pan · tap labels to select";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width;spacing:6
                                     RockButton {text:"Path";available:!!root.floorMap.layers && root.floorMap.layers.path.length>0;selected:root.showPath;onClicked:{root.showPath=!root.showPath;mapCanvas.requestPaint()}}
