@@ -174,6 +174,10 @@ class Robot:
         return result
     async def capture_map(self):
         result={}
+        from roborock.devices.traits.v1.map_content import MapContentConverter
+        from roborock.map.map_parser import MapParser, MapParserConfig
+        from vacuum_map_parser_base.config.drawable import Drawable
+        self.v.map_content.converter=MapContentConverter(MapParser(MapParserConfig(drawables=[Drawable.CHARGER,Drawable.VACUUM_POSITION])))
         await self.v.map_content.refresh()
         content=self.v.map_content
         if content.image_content:
@@ -183,6 +187,7 @@ class Robot:
             bg=Image.new('RGB',image.size,image.getpixel((0,0)))
             bounds=ImageChops.difference(image,bg).getbbox()
             calibration=content.map_data.calibration()
+            left=top=0
             if bounds:
                 left,top,right,bottom=bounds
                 left=max(0,left-40);top=max(0,top-40)
@@ -192,6 +197,8 @@ class Robot:
             out=io.BytesIO();image.save(out,format='PNG')
             result['mapImage']='data:image/png;base64,'+base64.b64encode(out.getvalue()).decode()
             result['calibration']=calibration
+            import map_layers
+            result['layers']=map_layers.serialize(content.map_data,left,top)
         if not result.get('mapImage'): raise ValueError('Map image unavailable')
         result['mapAt']=now()
         return result

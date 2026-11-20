@@ -24,6 +24,9 @@ Ui.Panel {
     property int mode: 0
     property int passes: 1
     property var selected: []
+    property bool showPath: true
+    property bool showObstacles: true
+    property bool showRestrictions: true
     property var zones: []
     property var draft: null
     property var pending: null
@@ -232,6 +235,11 @@ Ui.Panel {
                                                 var ctx=getContext("2d");ctx.clearRect(0,0,width,height)
                                                 if(!mapImage.sourceSize.width || !mapImage.sourceSize.height)return
                                                 var sx=width/mapImage.sourceSize.width,sy=height/mapImage.sourceSize.height
+                                                var layers=root.floorMap.layers||{}
+                                                function line(points,color,closed){if(!points.length)return;ctx.beginPath();ctx.moveTo(points[0][0]*sx,points[0][1]*sy);for(var i=1;i<points.length;i++)ctx.lineTo(points[i][0]*sx,points[i][1]*sy);if(closed)ctx.closePath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke()}
+                                                if(root.showPath)for(var path of (layers.path||[]))line(path.points,path.kind==="mop_path"?"#55ccee":"#f2d77a",false)
+                                                if(root.showRestrictions)for(var area of (layers.restrictions||[]))line(area.points,"#ff7676",area.points.length>2)
+                                                if(root.showObstacles)for(var obstacle of (layers.obstacles||[])){ctx.beginPath();ctx.arc(obstacle[0]*sx,obstacle[1]*sy,4,0,Math.PI*2);ctx.fillStyle="#ff9944";ctx.fill()}
                                                 var all=root.zones.slice();if(root.draft)all.push(root.draft)
                                                 ctx.strokeStyle=Color.accent;ctx.lineWidth=2;ctx.fillStyle=Qt.rgba(Color.accent.r,Color.accent.g,Color.accent.b,0.22)
                                                 for(var z of all){var x=Math.min(z[0],z[2])*sx,y=Math.min(z[1],z[3])*sy,w=Math.abs(z[2]-z[0])*sx,h=Math.abs(z[3]-z[1])*sy;ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h)}
@@ -254,6 +262,13 @@ Ui.Panel {
                                     Text {width:parent.width-110;text:root.floorMap.mapAt?"Map captured "+new Date(root.floorMap.mapAt).toLocaleTimeString(Qt.locale("en_GB"),"HH:mm"):"Robot-reported map";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
                                     RockButton {text:"Clear zones";onClicked:{root.zones=[];mapCanvas.requestPaint()}}
                                 }
+                                Flow {
+                                    width:parent.width;spacing:6
+                                    RockButton {text:"Path";available:!!root.floorMap.layers && root.floorMap.layers.path.length>0;selected:root.showPath;onClicked:{root.showPath=!root.showPath;mapCanvas.requestPaint()}}
+                                    RockButton {text:"Obstacles";available:!!root.floorMap.layers && root.floorMap.layers.obstacles.length>0;selected:root.showObstacles;onClicked:{root.showObstacles=!root.showObstacles;mapCanvas.requestPaint()}}
+                                    RockButton {text:"Restrictions";available:!!root.floorMap.layers && root.floorMap.layers.restrictions.length>0;selected:root.showRestrictions;onClicked:{root.showRestrictions=!root.showRestrictions;mapCanvas.requestPaint()}}
+                                }
+                                Text {width:parent.width;text:"Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence.";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width
                                     spacing:6
