@@ -1,4 +1,5 @@
 import QtQuick
+import "RoomGeometry.js" as RoomGeometry
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -320,6 +321,12 @@ Ui.Panel {
                                             acceptedButtons:Qt.LeftButton | Qt.RightButton
                                             property var panStart:null
                                             onWheel:function(wheel){mapViewport.zoom=Math.max(1,Math.min(5,mapViewport.zoom*(wheel.angleDelta.y>0?1.2:1/1.2)));wheel.accepted=true}
+                                            onClicked:function(mouse){
+                                                if(mouse.button!==Qt.LeftButton || root.scope!==0)return
+                                                var a=p(mouse)
+                                                var id=RoomGeometry.roomAt(root.floorMap.roomMaskPixels,root.current.rooms,a[0],a[1])
+                                                if(id!==null)root.chooseRoom(id)
+                                            }
                                             cursorShape:Qt.CrossCursor
                                             function p(mouse){return [Math.max(0,Math.min(mapImage.sourceSize.width,mouse.x/width*mapImage.sourceSize.width)),Math.max(0,Math.min(mapImage.sourceSize.height,mouse.y/height*mapImage.sourceSize.height))]}
                                             onPressed:function(mouse){if(mouse.button===Qt.RightButton){var v=mapToItem(mapViewport,mouse.x,mouse.y);panStart=[v.x,v.y,mapViewport.panX,mapViewport.panY];return};if(root.scope!==2 || !root.activeFloor)return;if(root.zones.length>=5){root.actionMessage="Maximum five zones";return};var a=p(mouse);root.draft=[a[0],a[1],a[0],a[1]];mapCanvas.requestPaint()}
@@ -341,7 +348,7 @@ Ui.Panel {
                                     RockButton {text:"Fit · "+Math.round(mapViewport.zoom*100)+"%";onClicked:mapViewport.fit()}
                                     RockButton {text:"Centre robot";available:!!(root.floorMap.layers||{}).robot;onClicked:mapViewport.centreRobot()}
                                 }
-                                Text {width:parent.width;text:"+/− or wheel/pinch: zoom · F: fit · B: robot · Ctrl+arrows/right-drag: pan · tap labels to select";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                                Text {width:parent.width;text:"+/− or wheel/pinch: zoom · F: fit · B: robot · Ctrl+arrows/right-drag: pan · tap room cells or labels to select";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width;spacing:6
                                     RockButton {text:"Activity age · T";available:root.hasRoomMask;selected:root.showActivityAge;onClicked:{root.showActivityAge=!root.showActivityAge;mapCanvas.requestPaint()}}
