@@ -85,7 +85,8 @@ Ui.Panel {
             id: catcher
             anchors.fill: parent
             onCloseRequested: {if(root.pending)root.pending=null;else root.close()}
-            onTextKey: function(t){if(t==="r")root.refreshRequested()}
+            onMoveRequested: function(dx,dy){if(dx)root.tab=(root.tab+dx+4)%4}
+            onTextKey: function(t){if(t==="r")root.refreshRequested();else if(t==="h")root.tab=1;else if(t==="m")root.tab=2;else if(t==="c")root.tab=3;else if(t==="o")root.tab=0}
             Flickable {
                 id: scroller
                 anchors.fill: parent

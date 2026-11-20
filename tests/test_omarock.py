@@ -26,3 +26,18 @@ class ValidationTests(unittest.TestCase):
     def test_many_zones(self):self.plan.update(scope='zone',zones=[[0,0,400,400]]*6);self.assertRaises(ValueError,m.validate_plan,self.plan,self.snapshot)
     def test_no_io_mutation(self):p=copy.deepcopy(self.plan);m.validate_plan(p,self.snapshot);self.assertEqual(p,self.plan)
 if __name__=='__main__':unittest.main()
+
+class CachedTests(unittest.TestCase):
+    def test_cached_robot_error_is_not_helper_failure(self):
+        import json,os,subprocess,sys,tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            state=Path(tmp)/'omarock';state.mkdir();(state/'snapshot.json').write_text(json.dumps({'error':'none','battery':100}))
+            env=dict(os.environ,HOME=tmp,XDG_STATE_HOME=tmp,XDG_CONFIG_HOME=tmp)
+            result=subprocess.run([sys.executable,str(Path(m.__file__)),'cached'],env=env,capture_output=True,text=True,check=True)
+            value=json.loads(result.stdout)
+            self.assertNotIn('error',value);self.assertEqual(value['robotError'],'none');self.assertEqual(value['battery'],100)
+    def test_cached_no_snapshot_is_honest(self):
+        import json,os,subprocess,sys,tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            result=subprocess.run([sys.executable,str(Path(m.__file__)),'cached'],env=dict(os.environ,HOME=tmp,XDG_STATE_HOME=tmp,XDG_CONFIG_HOME=tmp),capture_output=True,text=True,check=True)
+            value=json.loads(result.stdout);self.assertFalse(value['authPresent']);self.assertNotIn('battery',value)

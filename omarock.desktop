@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OmaRock
+Comment=Native Roborock map and controls for Omarchy
+Exec=omarchy shell shell summon io.github.brokemac79.omarock
+Icon=preferences-system
+Terminal=false
+Categories=Utility;
+Keywords=Roborock;Vacuum;Omarchy;
