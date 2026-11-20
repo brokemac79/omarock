@@ -2,6 +2,12 @@
 import math
 import time
 
+def age_color(days):
+    """Activity age only: grey unknown, green <2d, amber <7d, red older."""
+    if type(days) is not int or days < 0:
+        return '#888888'
+    return '#77cc99' if days < 2 else '#efbb66' if days < 7 else '#ee8888'
+
 def summarize(maps, history, clock=None):
     clock=time.time() if clock is None else clock
     result={}
@@ -26,6 +32,7 @@ def summarize(maps, history, clock=None):
                 times.append(stamp)
             last=max(times) if times else None
             rooms[str(rid)]={'last':last,'ageDays':int((clock-last)//86400) if last is not None else None,
+                            'activityColor':age_color(int((clock-last)//86400) if last is not None else None),
                             'evidenceRuns':len(times),'coverage':'unverified','mode':'unknown'}
         result[str(fid)]=rooms
     return result

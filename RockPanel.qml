@@ -25,6 +25,7 @@ Ui.Panel {
     property int passes: 1
     property var selected: []
     property bool showRoomGeometry: false
+    property bool showActivityAge: false
     property bool floorplanView: false
     readonly property bool hasRoomMask: !!floorMap.roomMaskPixels && floorMap.roomMaskPixels.coordinateFrame==="cropped-image-pixels"
     readonly property bool floorplanActive: floorplanView && hasRoomMask
@@ -50,7 +51,7 @@ Ui.Panel {
     readonly property bool authActive: loginForm.authActive
     onOpenedChanged: {if(!opened && loginForm.authActive)loginForm.cancel()}
     onPendingChanged: { if(pending)Qt.callLater(function(){scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)}) }
-    onReportChanged: { if(floor===-1 && report.activeFloor!==undefined)floor=report.activeFloor; if(tab===4 && !planReader.running)planReader.running=true }
+    onReportChanged: { Qt.callLater(function(){mapCanvas.requestPaint()}); if(floor===-1 && report.activeFloor!==undefined)floor=report.activeFloor; if(tab===4 && !planReader.running)planReader.running=true }
     function label(s) { return String(s===undefined || s===null ? "unknown" : s).replace(/_/g," ") }
     function chooseFloor(id) {floor=id;selected=[];zones=[];draft=null;mapCanvas.requestPaint()}
     function chooseRoom(id) {var a=selected.slice();var n=a.indexOf(id);if(n<0)a.push(id);else a.splice(n,1);selected=a;scope=0}
@@ -118,6 +119,7 @@ Ui.Panel {
                 else if(root.tab===0 && (event.key===Qt.Key_Plus || event.key===Qt.Key_Equal)) {mapViewport.zoom=Math.min(5,mapViewport.zoom*1.25);event.accepted=true}
                 else if(root.tab===0 && event.key===Qt.Key_Minus) {mapViewport.zoom=Math.max(1,mapViewport.zoom/1.25);event.accepted=true}
                 else if(root.tab===0 && event.key===Qt.Key_P) {if(root.hasRoomMask)root.floorplanView=!root.floorplanView;mapCanvas.requestPaint();event.accepted=true}
+                else if(root.tab===0 && event.key===Qt.Key_T) {root.showActivityAge=!root.showActivityAge;mapCanvas.requestPaint();event.accepted=true}
                 else if(root.tab===0 && event.key===Qt.Key_G) {root.showRoomGeometry=!root.showRoomGeometry;mapCanvas.requestPaint();event.accepted=true}
                 else if(root.tab===0 && event.key===Qt.Key_F) {mapViewport.fit();event.accepted=true}
                 else if(root.tab===0 && event.key===Qt.Key_B) {mapViewport.centreRobot();event.accepted=true}
@@ -277,11 +279,12 @@ Ui.Panel {
                                                 if(!mapImage.sourceSize.width || !mapImage.sourceSize.height)return
                                                 var sx=width/mapImage.sourceSize.width,sy=height/mapImage.sourceSize.height
                                                 var mask=root.floorMap.roomMaskPixels
-                                                if((root.showRoomGeometry || root.floorplanActive) && mask && mask.coordinateFrame==="cropped-image-pixels"){
+                                                if((root.showRoomGeometry || root.floorplanActive || root.showActivityAge) && mask && mask.coordinateFrame==="cropped-image-pixels"){
                                                     var palette=["#55ccee","#efbb66","#aa88dd","#77cc99"]
                                                     ctx.save();ctx.globalAlpha=root.floorplanActive ? 0.9 : 0.32
                                                     for(var ri=0;ri<mask.rooms.length;ri++){
-                                                        ctx.fillStyle=palette[ri%palette.length]
+                                                        var evidence=((root.report.roomFreshness||{})[String(root.floor)]||{})[String(mask.rooms[ri].id)]||({})
+                                                        ctx.fillStyle=root.showActivityAge ? (evidence.activityColor||"#888888") : palette[ri%palette.length]
                                                         for(var rect of mask.rooms[ri].rects)ctx.fillRect(rect[0]*sx,rect[1]*sy,rect[2]*sx,rect[3]*sy)
                                                     }
                                                     ctx.restore()
@@ -341,13 +344,14 @@ Ui.Panel {
                                 Text {width:parent.width;text:"+/− or wheel/pinch: zoom · F: fit · B: robot · Ctrl+arrows/right-drag: pan · tap labels to select";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width;spacing:6
+                                    RockButton {text:"Activity age · T";available:root.hasRoomMask;selected:root.showActivityAge;onClicked:{root.showActivityAge=!root.showActivityAge;mapCanvas.requestPaint()}}
                                     RockButton {text:"Floorplan · P";available:root.hasRoomMask;selected:root.floorplanActive;onClicked:{root.floorplanView=!root.floorplanView;mapCanvas.requestPaint()}}
                                     RockButton {text:"Room geometry · G";available:!!root.floorMap.roomMaskPixels;selected:root.showRoomGeometry;onClicked:{root.showRoomGeometry=!root.showRoomGeometry;mapCanvas.requestPaint()}}
                                     RockButton {text:"Path";available:!!root.floorMap.layers && root.floorMap.layers.path.length>0;selected:root.showPath;onClicked:{root.showPath=!root.showPath;mapCanvas.requestPaint()}}
                                     RockButton {text:"Obstacles";available:!!root.floorMap.layers && root.floorMap.layers.obstacles.length>0;selected:root.showObstacles;onClicked:{root.showObstacles=!root.showObstacles;mapCanvas.requestPaint()}}
                                     RockButton {text:"Restrictions";available:!!root.floorMap.layers && root.floorMap.layers.restrictions.length>0;selected:root.showRestrictions;onClicked:{root.showRestrictions=!root.showRestrictions;mapCanvas.requestPaint()}}
                                 }
-                                Text {width:parent.width;text:(root.floorplanActive ? "2D floorplan · captured room cells only; gaps are unknown, not walls. No height or metric scale. " : root.floorplanView ? "Floorplan unavailable for this floor/frame; showing vendor map. " : "")+"Room geometry: exact captured cells, NOT cleaning coverage or metric area. Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence. Room age = explicit completed room record; unknown mode/coverage."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                                Text {width:parent.width;text:(root.floorplanActive ? "2D floorplan · captured room cells only; gaps are unknown, not walls. No height or metric scale. " : root.floorplanView ? "Floorplan unavailable for this floor/frame; showing vendor map. " : "")+"Activity age: grey unknown; green <2d; amber 2–6d; red ≥7d. Explicit completed room records only, NOT vacuum/mop coverage. Room geometry: exact captured cells, NOT cleaning coverage or metric area. Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence. Room age = explicit completed room record; unknown mode/coverage."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width
                                     spacing:6

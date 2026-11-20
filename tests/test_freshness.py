@@ -22,3 +22,15 @@ class Freshness(unittest.TestCase):
    self.assertIsNone(self.row([dict(self.record,**change)])['last'])
  def test_newest(self):
   self.assertEqual(self.row([self.record,dict(self.record,end=190000)])['last'],190000)
+
+
+class ActivityColors(unittest.TestCase):
+ def test_unknown(self):
+  for days in [None, True, -1, '1', float('nan')]:
+   self.assertEqual(freshness.age_color(days),'#888888')
+ def test_thresholds(self):
+  for days,color in [(0,'#77cc99'),(1,'#77cc99'),(2,'#efbb66'),(6,'#efbb66'),(7,'#ee8888'),(120,'#ee8888')]:
+   self.assertEqual(freshness.age_color(days),color)
+ def test_missing_evidence_grey(self):
+  row=freshness.summarize([{'id':0,'rooms':[{'id':1}]}],[],200000)['0']['1']
+  self.assertEqual(row['activityColor'],'#888888')
