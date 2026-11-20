@@ -41,6 +41,12 @@ class AuthTests(unittest.IsolatedAsyncioTestCase):
         e,s,c=await self.run_flow([{'email':'p@example.com'},{'code':'bad'},{'action':'cancel'}]);self.assertEqual(c.codes,[]);self.assertFalse(s)
     async def test_retry_does_not_resend_email(self):
         e,s,c=await self.run_flow([{'email':'p@example.com'},{'code':'bad'},{'code':'123456'}]);self.assertEqual(c.requests,1);self.assertEqual(len(s),1)
+    async def test_constructor_failure_sanitized(self):
+        events=[]
+        async def read():return {'email':'p@example.com'}
+        def fail(email):raise ValueError('SECRET-CONSTRUCTOR')
+        await m.auth_flow(read,events.append,client_factory=fail)
+        self.assertNotIn('SECRET',json.dumps(events));self.assertEqual(events[-1]['state'],'error')
     async def test_timeout(self):
         events=[]
         async def read():await asyncio.sleep(1)

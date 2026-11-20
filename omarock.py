@@ -179,16 +179,19 @@ async def perform(operation, **kwargs):
         return await (robot.snapshot(**kwargs) if operation=='snapshot' else robot.execute(operation,**kwargs))
     finally: await robot.close()
 
+class AuthInputError(ValueError):
+    pass
+
 def validate_email(value):
-    if not isinstance(value,str): raise ValueError('Enter your Roborock account email address.')
+    if not isinstance(value,str): raise AuthInputError('Enter your Roborock account email address.')
     value=value.strip()
     if len(value)>254 or not re.fullmatch(r"[^\s@]{1,64}@[^\s@]+\.[^\s@]+",value):
-        raise ValueError('Enter a valid email address.')
+        raise AuthInputError('Enter a valid email address.')
     return value
 
 def validate_code(value):
     if not isinstance(value,str) or not re.fullmatch(r"[0-9]{6}",value.strip()):
-        raise ValueError('Enter the six-digit email code.')
+        raise AuthInputError('Enter the six-digit email code.')
     return value.strip()
 
 def write_session_file(path,value):
@@ -233,7 +236,7 @@ async def auth_flow(read,emit,client_factory=None,store=None,timeout=300):
             if not request or request.get('action')=='cancel':
                 emit({'state':'cancelled'});return
             try:code=validate_code(request.get('code'))
-            except ValueError as error:
+            except AuthInputError as error:
                 emit({'state':'code_sent','message':str(error)});continue
             emit({'state':'verifying','message':'Verifying your code…'})
             try:user_data=await asyncio.wait_for(client.code_login(code),45)
@@ -247,7 +250,7 @@ async def auth_flow(read,emit,client_factory=None,store=None,timeout=300):
         emit({'state':'error','message':'Too many unsuccessful attempts. Cancel and request a new code when ready.'})
     except asyncio.TimeoutError:
         emit({'state':'expired','message':'Sign-in timed out. Request a new code when ready.'})
-    except ValueError as error:
+    except AuthInputError as error:
         emit({'state':'error','message':str(error)})
     except Exception:
         emit({'state':'error','message':'Sign-in could not finish. Cancel and try again.'})
@@ -263,8 +266,8 @@ async def auth_stdio():
         line=await reader.readline()
         if not line:return None
         try:value=json.loads(line)
-        except (ValueError,UnicodeError):raise ValueError('Invalid sign-in request')
-        if not isinstance(value,dict):raise ValueError('Invalid sign-in request')
+        except (ValueError,UnicodeError):raise AuthInputError('Invalid sign-in request')
+        if not isinstance(value,dict):raise AuthInputError('Invalid sign-in request')
         return value
     def emit(value): print(json.dumps(value),flush=True)
     try:await auth_flow(read,emit)
