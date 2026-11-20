@@ -183,7 +183,10 @@ class Robot:
         from roborock.devices.traits.v1.map_content import MapContentConverter
         from roborock.map.map_parser import MapParser, MapParserConfig
         from vacuum_map_parser_base.config.drawable import Drawable
-        self.v.map_content.converter=MapContentConverter(MapParser(MapParserConfig(drawables=[Drawable.CHARGER,Drawable.VACUUM_POSITION])))
+        import mask_capture
+        parser=MapParser(MapParserConfig(drawables=[Drawable.CHARGER,Drawable.VACUUM_POSITION]))
+        grid_tap=mask_capture.attach(parser)
+        self.v.map_content.converter=MapContentConverter(parser)
         await self.v.map_content.refresh()
         content=self.v.map_content
         if content.image_content:
@@ -206,6 +209,8 @@ class Robot:
             import map_layers
             result['layers']=map_layers.serialize(content.map_data,left,top)
         if not result.get('mapImage'): raise ValueError('Map image unavailable')
+        # Uncalibrated masks stay in private per-floor capture state, not a UI overlay.
+        result['roomGrid']=grid_tap.mask if grid_tap else None
         result['mapAt']=now()
         return result
 
