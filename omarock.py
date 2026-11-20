@@ -168,6 +168,8 @@ class Robot:
         archived=records.merge_history(load(STATE/'history.json',[]),result.get('history',[]))
         save(STATE/'history.json',archived)
         result['historyArchive']=archived
+        import freshness
+        result['roomFreshness']=freshness.summarize(result.get('maps',[]),archived)
         result['alerts']=records.alerts(result)
         if self.config.get('desktop_notifications',True):
             def send(title,message):

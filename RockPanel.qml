@@ -279,7 +279,8 @@ Ui.Panel {
                                                 required property var modelData
                                                 readonly property var room: (root.current.rooms||[]).find(function(r){return r.id===modelData.id})
                                                 visible:!!room && root.scope===0 && mapImage.status===Image.Ready
-                                                text:room ? room.name : ""
+                                                readonly property var freshness: ((root.report.roomFreshness||{})[String(root.floor)]||{})[String(modelData.id)]||({})
+                                                text:room ? room.name+" · "+(freshness.last ? freshness.ageDays+"d activity" : "unknown") : ""
                                                 selected:root.selected.indexOf(modelData.id)>=0
                                                 x:modelData.anchor[0]*imagePlane.width/Math.max(1,mapImage.sourceSize.width)-width/2
                                                 y:modelData.anchor[1]*imagePlane.height/Math.max(1,mapImage.sourceSize.height)-height/2
@@ -321,7 +322,7 @@ Ui.Panel {
                                     RockButton {text:"Obstacles";available:!!root.floorMap.layers && root.floorMap.layers.obstacles.length>0;selected:root.showObstacles;onClicked:{root.showObstacles=!root.showObstacles;mapCanvas.requestPaint()}}
                                     RockButton {text:"Restrictions";available:!!root.floorMap.layers && root.floorMap.layers.restrictions.length>0;selected:root.showRestrictions;onClicked:{root.showRestrictions=!root.showRestrictions;mapCanvas.requestPaint()}}
                                 }
-                                Text {width:parent.width;text:"Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                                Text {width:parent.width;text:"Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence. Room age = explicit completed room record; unknown mode/coverage."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width
                                     spacing:6
