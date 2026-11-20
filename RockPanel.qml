@@ -273,6 +273,20 @@ Ui.Panel {
                                                 for(var z of all){var x=Math.min(z[0],z[2])*sx,y=Math.min(z[1],z[3])*sy,w=Math.abs(z[2]-z[0])*sx,h=Math.abs(z[3]-z[1])*sy;ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h)}
                                             }
                                         }
+                                        Repeater {
+                                            model:(root.floorMap.layers||{}).rooms||[]
+                                            delegate:RockButton {
+                                                required property var modelData
+                                                readonly property var room: (root.current.rooms||[]).find(function(r){return r.id===modelData.id})
+                                                visible:!!room && root.scope===0 && mapImage.status===Image.Ready
+                                                text:room ? room.name : ""
+                                                selected:root.selected.indexOf(modelData.id)>=0
+                                                x:modelData.anchor[0]*imagePlane.width/Math.max(1,mapImage.sourceSize.width)-width/2
+                                                y:modelData.anchor[1]*imagePlane.height/Math.max(1,mapImage.sourceSize.height)-height/2
+                                                z:2
+                                                onClicked:root.chooseRoom(modelData.id)
+                                            }
+                                        }
                                         MouseArea {
                                             anchors.fill:parent
                                             enabled:mapImage.status===Image.Ready
@@ -300,7 +314,7 @@ Ui.Panel {
                                     RockButton {text:"Fit";onClicked:mapViewport.fit()}
                                     RockButton {text:"Centre robot";available:!!(root.floorMap.layers||{}).robot;onClicked:mapViewport.centreRobot()}
                                 }
-                                Text {width:parent.width;text:"Wheel / pinch to zoom · right-drag to pan · left-drag draws zones in Zone mode";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                                Text {width:parent.width;text:"Wheel / pinch to zoom · right-drag to pan · tap room labels to select · left-drag draws zones in Zone mode";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width;spacing:6
                                     RockButton {text:"Path";available:!!root.floorMap.layers && root.floorMap.layers.path.length>0;selected:root.showPath;onClicked:{root.showPath=!root.showPath;mapCanvas.requestPaint()}}

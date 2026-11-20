@@ -18,3 +18,10 @@ class Layers(unittest.TestCase):
  def test_robot_crop(self):
   d=self.data();d.vacuum_position=Point(10,20)
   self.assertEqual(map_layers.serialize(d,3,5)['robot'],[17,153])
+
+ def test_room_anchor_crop(self):
+  d=self.data();d.rooms={16:S(pos_x=10,pos_y=20,x0=0,y0=0,x1=30,y1=40)}
+  self.assertEqual(map_layers.serialize(d,3,5)['rooms'],[{'id':16,'anchor':[17,153]}])
+ def test_room_bounds_anchor_not_polygon(self):
+  d=self.data();d.rooms={16:S(pos_x=None,pos_y=None,x0=0,y0=0,x1=20,y1=40)}
+  self.assertEqual(map_layers.serialize(d)['rooms'],[{'id':16,'anchor':[20,158]}])

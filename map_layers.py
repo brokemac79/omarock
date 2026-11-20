@@ -16,5 +16,10 @@ def serialize(data, left=0, top=0):
         for a in getattr(data,name,None) or []:
             count=2 if name=='walls' else 4
             restrictions.append({'kind':name,'points':[point(Point(getattr(a,'x'+str(i)),getattr(a,'y'+str(i)))) for i in range(count)]})
+    rooms=[]
+    for number,room in (getattr(data,'rooms',None) or {}).items():
+        if type(number) is not int: continue
+        anchor=Point(room.pos_x,room.pos_y) if room.pos_x is not None and room.pos_y is not None else Point((room.x0+room.x1)/2,(room.y0+room.y1)/2)
+        rooms.append({'id':number,'anchor':point(anchor)})
     robot=getattr(data,'vacuum_position',None)
-    return {'robot':point(robot) if robot is not None else None,'path':paths,'obstacles':obstacles,'restrictions':restrictions,'carpetNote':'Carpet raster decoding unavailable; not inferred from map colours.'}
+    return {'rooms':rooms,'robot':point(robot) if robot is not None else None,'path':paths,'obstacles':obstacles,'restrictions':restrictions,'carpetNote':'Carpet raster decoding unavailable; not inferred from map colours.'}
