@@ -361,6 +361,32 @@ Ui.Panel {
                             }
                         }
                     }
+                    Column {
+                        width:parent.width;spacing:8;visible:root.tab===3
+                        Text {text:"CLEANING PREFERENCES";color:Color.foreground;font.pixelSize:16}
+                        Text {width:parent.width;text:"Model-reported options only. Changes require review and the safety lock; physical effect is untested. These are robot-wide preferences, not per-room overrides.";color:root.muted;font.pixelSize:11;wrapMode:Text.WordWrap}
+                        Repeater {
+                            model:["suction","water","mop_route"]
+                            Column {
+                                required property string modelData
+                                property string preferenceKey:modelData
+                                property var setting:(root.report.cleaningSettings||{})[modelData]
+                                width:parent.width;spacing:5
+                                Text {text:parent.preferenceKey.replace(/_/g," ")+" · "+(parent.setting?parent.setting.options.filter(function(o){return o.value===parent.setting.value}).map(function(o){return o.label}).join(""):"Unavailable");color:Color.foreground;font.pixelSize:13}
+                                Flow {
+                                    width:parent.width;spacing:6
+                                    Repeater {
+                                        model:parent.parent.setting?parent.parent.setting.options:[]
+                                        RockButton {
+                                            required property var modelData
+                                            text:"Review "+modelData.label
+                                            onClicked:{root.pending={action:"cleaning-setting",plan:{setting:parent.parent.preferenceKey,value:modelData.value,reviewed:true}};root.actionMessage=""}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     TimedSchedules {width:parent.width;visible:root.tab===5;python:root.python;base:root.base;maps:root.maps}
                     SchedulePane {
                         id: schedule
@@ -383,7 +409,7 @@ Ui.Panel {
                             id:reviewBody
                             anchors{left:parent.left;right:parent.right;top:parent.top;margins:14}
                             spacing:12
-                            Text {text:root.pending && root.pending.action==="clean"?"Review: "+root.current.name+" · "+["Rooms","Whole floor","Zone"][root.scope]+" · "+["Vacuum","Vacuum & mop","Mop"][root.mode]:root.pending && root.pending.action==="setting"?"Review setting: "+root.pending.plan.setting+" → "+root.pending.plan.value:"Confirm: "+(root.pending?root.pending.action+(root.pending.action==="reset-consumable"?" · "+root.pending.plan.consumable+" · I have replaced/cleaned this part":""):"");color:Color.foreground;font.family:Style.font.family;font.pixelSize:14}
+                            Text {text:root.pending && root.pending.action==="clean"?"Review: "+root.current.name+" · "+["Rooms","Whole floor","Zone"][root.scope]+" · "+["Vacuum","Vacuum & mop","Mop"][root.mode]:root.pending && (root.pending.action==="setting" || root.pending.action==="cleaning-setting")?"Review setting: "+root.pending.plan.setting+" → "+root.pending.plan.value:"Confirm: "+(root.pending?root.pending.action+(root.pending.action==="reset-consumable"?" · "+root.pending.plan.consumable+" · I have replaced/cleaned this part":""):"");color:Color.foreground;font.family:Style.font.family;font.pixelSize:14}
                             RockButton {visible:!!root.pending && root.pending.action==="clean";text:(root.confirmedFloor?"✓ ":"□ ")+"Robot is physically on "+root.current.name;selected:root.confirmedFloor;onClicked:root.confirmedFloor=!root.confirmedFloor}
                             Text {text:root.pending && root.pending.action==="import-maps"?"While idle: briefly select each saved map, cache its image, then restore the original selection. No cleaning.":root.writable?"This will operate your robot. Supervise the first test.":"Safety lock or stale state: preview only. No device command can be sent.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11}
                             RockButton {visible:!!root.pending && !!root.pending.routine;text:((root.pending && root.pending.routine && root.pending.routine.reviewed)?"✓ ":"□ ")+"I checked routine steps and physical floor in the official app";onClicked:{var p=root.pending;p.routine.reviewed=!p.routine.reviewed;root.pending=null;root.pending=p}}

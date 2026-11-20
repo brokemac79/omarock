@@ -129,6 +129,8 @@ class Robot:
         except Exception:
             result['routinesAvailable']=False
             errors.append('Routines unavailable')
+        import cleaning_settings
+        result['cleaningSettings']=cleaning_settings.snapshot(s)
         result['deviceSettings']={}
         for key,attribute in [('volume','sound_volume'),('dnd','dnd'),('child_lock','child_lock')]:
             try:
@@ -236,6 +238,14 @@ class Robot:
     async def execute(self, action, plan=None):
         if self.config.get('allow_control') is not True: raise ValueError('Control locked. Explicitly enable allow_control in your private config after supervised testing')
         await self.v.status.refresh()
+        if action=='cleaning-setting':
+            import cleaning_settings
+            from roborock.roborock_typing import RoborockCommand
+            command,value=cleaning_settings.validate(plan,self.v.status)
+            if self.v.status.in_cleaning or self.v.status.in_returning: raise ValueError('Robot busy')
+            if self.v.status.error_code or self.v.status.dock_error_status: raise ValueError('Resolve robot/dock warnings first')
+            await self.v.command.send(getattr(RoborockCommand,command),[value])
+            return 'Preference submitted; refresh to verify'
         if action=='setting':
             import device_settings
             key,value=device_settings.validate(plan)
