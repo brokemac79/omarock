@@ -279,27 +279,7 @@ Ui.Panel {
                             }
                         }
                     }
-                    Column {
-                        width:parent.width
-                        spacing:10
-                        visible:root.tab===1
-                        Text {text:"Recent activity";color:Color.foreground;font.family:Style.font.family;font.pixelSize:22}
-                        Text {width:parent.width;text:"Floor runs do not prove every room was cleaned. Missing room IDs remain unknown.";color:root.muted;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap}
-                        Repeater {
-                            model:root.report.history||[]
-                            Rectangle {
-                                required property var modelData
-                                width:body.width
-                                height:75
-                                radius:5
-                                color:Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.045)
-                                Column {anchors{left:parent.left;verticalCenter:parent.verticalCenter;leftMargin:14} spacing:7
-                                    Text {text:root.floorName(modelData.map_flag)+" · "+root.date(modelData.begin);color:Color.foreground;font.family:Style.font.family;font.pixelSize:12}
-                                    Text {text:(modelData.area/1000000).toFixed(1)+" m² · "+Math.round(modelData.duration/60)+" min · "+(modelData.complete===1?"Complete":"Completion unconfirmed")+" · Rooms "+((modelData.area_ids||[]).length?modelData.area_ids.join(", "):"unknown");color:root.muted;font.family:Style.font.family;font.pixelSize:10}
-                                }
-                            }
-                        }
-                    }
+                    HistoryPane {width:parent.width;visible:root.tab===1;records:root.report.historyArchive||root.report.history||[];maps:root.maps}
                     Column {
                         width:parent.width
                         spacing:12

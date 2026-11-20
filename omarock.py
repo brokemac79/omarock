@@ -127,6 +127,16 @@ class Robot:
             except Exception: errors.append('Map unavailable')
         result['floorMaps']=cached
         result.update(cached.get(key,{}))
+        import records,time,subprocess
+        archived=records.merge_history(load(STATE/'history.json',[]),result.get('history',[]))
+        save(STATE/'history.json',archived)
+        result['historyArchive']=archived
+        result['alerts']=records.alerts(result)
+        if self.config.get('desktop_notifications',True):
+            def send(title,message):
+                try: return subprocess.run(['notify-send','--app-name=OmaRock',title,message],timeout=5,capture_output=True).returncode==0
+                except (OSError,subprocess.TimeoutExpired): return False
+            save(STATE/'alerts.json',records.notify(result,load(STATE/'alerts.json',{}),time.time(),send))
         result['warnings']=errors
         return result
     async def capture_map(self):
