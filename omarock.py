@@ -98,6 +98,8 @@ class Robot:
                 'washing':s.wash_status,'drying':s.dry_status,'drySeconds':s.rdt,
                 'mode':s.current_cleaning_mode_name,'controlsEnabled':self.config.get('allow_control') is True,
                 'tankNote':'Flags, not fill levels. Clean tank removal verified; dirty tank unverified.'}
+        import dock_controls
+        result['dockControls']=dock_controls.capabilities(s)
         errors=[]
         for label,trait in [('maps',self.v.maps),('consumables',self.v.consumables),('history',self.v.clean_summary)]:
             try:
@@ -246,6 +248,18 @@ class Robot:
             if self.v.status.error_code or self.v.status.dock_error_status: raise ValueError('Resolve robot/dock warnings first')
             await self.v.command.send(getattr(RoborockCommand,command),[value])
             return 'Preference submitted; refresh to verify'
+        if action=='dock-cycle':
+            import dock_controls
+            from roborock.roborock_typing import RoborockCommand
+            cycle=dock_controls.validate(plan,self.v.status)
+            if cycle in ('dry','stop_dry'):
+                trait=self.v.mop_dryer
+                if trait is None: raise ValueError('Dryer trait unavailable')
+                await (trait.start_dry() if cycle=='dry' else trait.stop_dry())
+            else:
+                commands={'wash':'APP_START_WASH','stop_wash':'APP_STOP_WASH','empty':'APP_START_COLLECT_DUST','stop_empty':'APP_STOP_COLLECT_DUST'}
+                await self.v.command.send(getattr(RoborockCommand,commands[cycle]))
+            return 'Dock cycle submitted; physical effect unverified'
         if action=='setting':
             import device_settings
             key,value=device_settings.validate(plan)
