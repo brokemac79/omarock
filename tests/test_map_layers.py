@@ -12,3 +12,9 @@ class Layers(unittest.TestCase):
  def test_separate_paths_restrictions(self):
   d=self.data();d.path=S(path=[[Point(1,2),Point(3,4)]]);d.no_go_areas=[Area(1,2,3,4,5,6,7,8)]
   r=map_layers.serialize(d);self.assertEqual(len(r['path'][0]['points']),2);self.assertEqual(len(r['restrictions'][0]['points']),4)
+
+ def test_robot_missing(self):
+  self.assertIsNone(map_layers.serialize(self.data())['robot'])
+ def test_robot_crop(self):
+  d=self.data();d.vacuum_position=Point(10,20)
+  self.assertEqual(map_layers.serialize(d,3,5)['robot'],[17,153])

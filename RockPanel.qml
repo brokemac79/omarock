@@ -207,6 +207,12 @@ Ui.Panel {
                                     property real panX: 0
                                     property real panY: 0
                                     function fit() {zoom=1;panX=0;panY=0}
+                                    function centreRobot() {
+                                        var p=(root.floorMap.layers||{}).robot
+                                        if(!p || !mapImage.sourceSize.width || !imagePlane.width)return
+                                        panX=(imagePlane.width/2-p[0]*imagePlane.width/mapImage.sourceSize.width)*zoom
+                                        panY=(imagePlane.height/2-p[1]*imagePlane.height/mapImage.sourceSize.height)*zoom
+                                    }
                                     onWidthChanged:fit()
                                     Connections {target:root;function onFloorChanged(){mapViewport.fit()}}
                                     PinchHandler {
@@ -292,6 +298,7 @@ Ui.Panel {
                                     RockButton {text:"−";onClicked:mapViewport.zoom=Math.max(1,mapViewport.zoom/1.25)}
                                     RockButton {text:"+";onClicked:mapViewport.zoom=Math.min(5,mapViewport.zoom*1.25)}
                                     RockButton {text:"Fit";onClicked:mapViewport.fit()}
+                                    RockButton {text:"Centre robot";available:!!(root.floorMap.layers||{}).robot;onClicked:mapViewport.centreRobot()}
                                 }
                                 Text {width:parent.width;text:"Wheel / pinch to zoom · right-drag to pan · left-drag draws zones in Zone mode";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
