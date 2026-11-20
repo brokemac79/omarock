@@ -326,7 +326,7 @@ async def auth_stdio():
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('command',choices=['snapshot','cached','bar','action','auth','import-maps','planner','save-plan'])
+    parser.add_argument('command',choices=['snapshot','cached','bar','action','auth','import-maps','planner','save-plan','schedules','save-schedule','delete-schedule','scheduler-tick'])
     parser.add_argument('--request',default='{}')
     args=parser.parse_args()
     private_dir(STATE);private_dir(CONFIG)
@@ -334,12 +334,35 @@ def main():
         os.umask(0o077)
         asyncio.run(auth_stdio());return
     try:
-        if args.command in ('snapshot','import-maps','action'):
+        if args.command in ('snapshot','import-maps','action','scheduler-tick','save-schedule','delete-schedule'):
             import fcntl
             lock=open(STATE/'device.lock','w')
             try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
             except BlockingIOError: raise ValueError('Another device operation is running; try again shortly')
-        if args.command=='import-maps':
+        if args.command in ('schedules','save-schedule','delete-schedule'):
+            import scheduler,uuid
+            schedules=load(STATE/'schedules.json',{})
+            request=json.loads(args.request)
+            if args.command=='save-schedule':
+                snapshot=load(STATE/'snapshot.json',{})
+                config=load(CONFIG/'config.json',{})
+                value=scheduler.validate(request,snapshot.get('maps',[]),config.get('allow_control') is True)
+                schedules[uuid.uuid4().hex]=value
+                save(STATE/'schedules.json',schedules)
+            elif args.command=='delete-schedule':
+                schedules.pop(request.get('id'),None)
+                save(STATE/'schedules.json',schedules)
+            result={'schedules':[dict(v,id=k) for k,v in schedules.items()],'controlsEnabled':load(CONFIG/'config.json',{}).get('allow_control') is True}
+        elif args.command=='scheduler-tick':
+            import scheduler
+            journal=load(STATE/'schedule-journal.json',{})
+            async def dispatch(schedule):
+                plan={'floor':schedule['floor'],'confirmedFloor':schedule['floor'],'mode':schedule['mode'],'passes':1,'scope':'floor' if schedule['room'] is None else 'rooms','rooms':[] if schedule['room'] is None else [schedule['room']]}
+                # execute rechecks current map, busy, battery, errors and control lock.
+                # Never switches floor maps or wakes a sleeping desktop.
+                return await perform('clean',plan=plan)
+            result={'outcomes':asyncio.run(scheduler.tick(load(STATE/'schedules.json',{}),journal,dt.datetime.now(dt.timezone.utc),dispatch,lambda j:save(STATE/'schedule-journal.json',j)))}
+        elif args.command=='import-maps':
             if json.loads(args.request).get('confirmed') is not True: raise ValueError('Explicit map-import confirmation required')
             result=asyncio.run(perform('import-maps'))
             save(STATE/'snapshot.json',result)

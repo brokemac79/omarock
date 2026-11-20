@@ -106,8 +106,8 @@ Ui.Panel {
             focus: true
             Keys.onPressed: function(event) {
                 if(event.key===Qt.Key_Escape) { if(root.pending)root.pending=null;else root.close();event.accepted=true }
-                else if(event.key===Qt.Key_Right) {root.tab=(root.tab+1)%5;event.accepted=true}
-                else if(event.key===Qt.Key_Left) {root.tab=(root.tab+4)%5;event.accepted=true}
+                else if(event.key===Qt.Key_Right) {root.tab=(root.tab+1)%6;event.accepted=true}
+                else if(event.key===Qt.Key_Left) {root.tab=(root.tab+5)%6;event.accepted=true}
                 else if(event.key===Qt.Key_R) {root.refreshRequested();event.accepted=true}
                 else if(event.key===Qt.Key_H) {root.tab=1;event.accepted=true}
                 else if(event.key===Qt.Key_M) {root.tab=2;event.accepted=true}
@@ -127,7 +127,7 @@ Ui.Panel {
                     Text {text:"YOUR HOME, IN VIEW";color:root.muted;font.family:Style.font.family;font.pixelSize:9}
                     Item {width:1;height:20}
                     Repeater {
-                        model:["◈ Overview","◷ History","⌁ Maintenance","⚙ Connection","▤ Timeline"]
+                        model:["◈ Overview","◷ History","⌁ Maintenance","⚙ Connection","▤ Timeline","◷ Schedules"]
                         RockButton {required property string modelData;required property int index;width:148;height:40;text:modelData;selected:root.tab===index;onClicked:{root.tab=index;catcher.forceActiveFocus()}}
                     }
                 }
@@ -330,12 +330,14 @@ Ui.Panel {
                         }
                         Text {width:parent.width;text:"Import all floors caches saved map images while idle and restores the original map selection. Browsing cached floors never switches the robot. Cleaning still requires the robot’s active map and physical-floor confirmation. Room freshness is not inferred from incomplete history. Cleaning/mode/zone control awaits supervised Saros 20 testing.";color:root.muted;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
                     }
+                    TimedSchedules {width:parent.width;visible:root.tab===5;python:root.python;base:root.base;maps:root.maps}
                     SchedulePane {
                         id: schedule
                         width:parent.width
                         visible:root.tab===4
                         python:root.python
                         base:root.base
+                        viewportHeight:scroller.height-160
                         onEditingChanged:{if(editing)Qt.callLater(function(){scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)})}
                         onCleanRequested:function(floorId,roomId,cleanMode){root.chooseFloor(floorId);root.scope=roomId===null?1:0;root.selected=roomId===null?[]:[roomId];root.mode=cleanMode==="mop"?2:0;root.tab=0;root.actionMessage="Review the active map and physical floor before cleaning."}
                     }

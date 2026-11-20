@@ -11,10 +11,12 @@ Column {
     property var editing: null
     property int intervalDays: 7
     property string message: ""
+    property real viewportHeight: 440
+    property var expanded: ({})
     signal cleanRequested(var floorId,var roomId,string cleanMode)
     spacing:12
     Text {text:"Cleaning rhythm";color:Color.foreground;font.family:Style.font.family;font.pixelSize:24;font.bold:true}
-    Text {width:parent.width;text:"Per floor. Per room. Vacuum and mop, independently. Local plans only — no automatic dispatch.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap}
+    Text {width:parent.width;text:"Expand a floor to see its rooms. Past activity ← Today → future reminder dates. Real timed jobs are under Schedules.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap}
     Flow {
         width:parent.width;spacing:6
         RockButton {text:"All floors";selected:root.filterFloor===-1;onClicked:root.filterFloor=-1}
@@ -27,8 +29,20 @@ Column {
             Repeater {model:["−7d","−3d","TODAY","+3d","+7d"];Text {required property string modelData;required property int index;x:index*(parent.width-30)/4;width:40;text:modelData;color:Color.accent;font.family:Style.font.family;font.pixelSize:10}}
         }
     }
+    Flickable {
+        id: roomScroll
+        width:parent.width
+        height:Math.max(160,root.viewportHeight-150-(root.editing?130:0))
+        clip:true
+        contentWidth:width
+        contentHeight:cards.implicitHeight
+        boundsBehavior:Flickable.StopAtBounds
+        Column {
+            id:cards
+            width:parent.width
+            spacing:8
     Repeater {
-        model:root.rows.filter(function(r){return root.filterFloor===-1 || root.filterFloor===r.floor})
+        model:root.rows.filter(function(r){return (root.filterFloor===-1 || root.filterFloor===r.floor) && (r.room===null || root.expanded[String(r.floor)]===true)})
         Rectangle {
             id: card
             required property var modelData
@@ -38,6 +52,7 @@ Column {
                 id:cardContent
                 anchors {left:parent.left;right:parent.right;top:parent.top;margins:10}
                 spacing:7
+                RockButton {visible:card.modelData.room===null;text:(root.expanded[String(card.modelData.floor)]?"▾ Hide rooms":"▸ Show rooms");height:28;onClicked:{var e=Object.assign({},root.expanded);e[String(card.modelData.floor)]=!e[String(card.modelData.floor)];root.expanded=e}}
                 Text {text:card.modelData.name+(card.modelData.room===null?"":"  ·  "+card.modelData.floorName);color:Color.foreground;font.family:Style.font.family;font.pixelSize:12;font.bold:card.modelData.room===null}
                 Column {
                     width:parent.width
@@ -81,18 +96,21 @@ Column {
                             Rectangle {visible:modelData.due!==null;x:Math.max(3,Math.min(parent.width-8,parent.width/2+(modelData.due-Date.now()/1000)/86400/14*parent.width));width:6;height:6;radius:3;anchors.verticalCenter:parent.verticalCenter;color:modelData.status==="overdue"?"#ed8796":Color.accent}
                             Text {anchors.left:parent.left;anchors.leftMargin:6;anchors.verticalCenter:parent.verticalCenter;text:modelData.days?"Every "+modelData.days+"d · "+new Date(modelData.due*1000).toLocaleDateString(Qt.locale("en_GB"),"d MMM"):"No plan · last clean unknown";color:Color.foreground;font.family:Style.font.family;font.pixelSize:9}
                         }
-                        RockButton {text:"Edit";height:28;onClicked:{root.editing={floor:card.modelData.floor,room:card.modelData.room,mode:modelData.mode};root.intervalDays=modelData.days||7}}
+                        RockButton {text:"Reminder";height:28;onClicked:{root.editing={floor:card.modelData.floor,room:card.modelData.room,mode:modelData.mode};root.intervalDays=modelData.days||7}}
                         RockButton {text:"Clean now";height:28;onClicked:root.cleanRequested(card.modelData.floor,card.modelData.room,modelData.mode)}
                     }
                 }
             }
         }
     }
+        }
+        Rectangle {anchors.right:parent.right;width:4;radius:2;color:Color.accent;opacity:0.55;visible:roomScroll.contentHeight>roomScroll.height;height:Math.max(20,roomScroll.height*roomScroll.visibleArea.heightRatio);y:roomScroll.visibleArea.yPosition*roomScroll.height}
+    }
     Column {
         visible:root.editing!==null;width:parent.width;spacing:8
-        Text {text:"Repeat interval · "+(root.editing?root.editing.mode:"");color:Color.accent;font.family:Style.font.family;font.pixelSize:13}
+        Text {text:"Local reminder interval · "+(root.editing?root.editing.mode:"");color:Color.accent;font.family:Style.font.family;font.pixelSize:13}
         Flow {width:parent.width;spacing:6;Repeater {model:[0,1,2,3,7,14,30];RockButton {required property int modelData;text:modelData?modelData+" days":"Off";selected:root.intervalDays===modelData;onClicked:root.intervalDays=modelData}}}
-        Row {spacing:8;RockButton {text:"Cancel";onClicked:root.editing=null} RockButton {text:"Save plan";primary:true;available:!saver.running;onClicked:{var p=Object.assign({},root.editing,{days:root.intervalDays});saver.command=[root.python,root.base+"/omarock.py","save-plan","--request",JSON.stringify(p)];saver.running=true}}}
+        Row {spacing:8;RockButton {text:"Cancel";onClicked:root.editing=null} RockButton {text:"Save reminder";primary:true;available:!saver.running;onClicked:{var p=Object.assign({},root.editing,{days:root.intervalDays});saver.command=[root.python,root.base+"/omarock.py","save-plan","--request",JSON.stringify(p)];saver.running=true}}}
     }
     Text {width:parent.width;text:root.message||"Past room/mode coverage cannot yet be verified from imported Roborock history. Unknown is not overdue. Dots show planned due dates, not completed cleans. Clean now opens review; it does not start the robot.";color:Color.foreground;opacity:0.6;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
     Process {id:saver;stdout:StdioCollector {onStreamFinished:{try{var v=JSON.parse(text);if(v.error)root.message=v.error;else{root.rows=v.rows;root.editing=null;root.message="Plan saved locally. Automatic cleaning is disabled."}}catch(e){root.message="Plan could not be saved"}}}}
