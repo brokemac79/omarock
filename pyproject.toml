@@ -1,0 +1,7 @@
+[project]
+name = "omarock"
+version = "0.1.0"
+description = "Roborock controls and maps for Omarchy"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = ["python-roborock[cli]==7.23.2"]

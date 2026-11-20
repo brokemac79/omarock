@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env*
+.roborock*
+data/
+*.log
+snapshot.json
+server.json

@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"io.github.brokemac79.omarock","name":"OmaRock","version":"0.1.0","author":"brokemac79","description":"Roborock maps, room/floor/zone cleaning and dock status. Independent community plugin.","kinds":["bar-widget"],"entryPoints":{"barWidget":"BarWidget.qml"},"barWidget":{"displayName":"OmaRock","category":"Info","allowMultiple":false}}
