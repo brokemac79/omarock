@@ -129,6 +129,24 @@ class Robot:
         except Exception:
             result['routinesAvailable']=False
             errors.append('Routines unavailable')
+        result['deviceSettings']={}
+        for key,attribute in [('volume','sound_volume'),('dnd','dnd'),('child_lock','child_lock')]:
+            try:
+                trait=getattr(self.v,attribute)
+                await trait.refresh()
+                if key=='volume':
+                    value=trait.volume
+                    if type(value) is not int or not 0<=value<=100: raise ValueError('Unavailable')
+                    row={'value':value}
+                elif key=='dnd':
+                    if trait.enabled not in (0,1): raise ValueError('Unavailable')
+                    row={'value':trait.is_on,'startHour':trait.start_hour,'startMinute':trait.start_minute,'endHour':trait.end_hour,'endMinute':trait.end_minute}
+                else:
+                    if trait.lock_status not in (0,1): raise ValueError('Unavailable')
+                    row={'value':trait.is_on}
+                result['deviceSettings'][key]=row
+            except Exception:
+                errors.append(key+' setting unavailable')
         cached=load(STATE/'floor-maps.json',{})
         key=str(result['activeFloor'])
         if include_map or key not in cached:
@@ -218,6 +236,23 @@ class Robot:
     async def execute(self, action, plan=None):
         if self.config.get('allow_control') is not True: raise ValueError('Control locked. Explicitly enable allow_control in your private config after supervised testing')
         await self.v.status.refresh()
+        if action=='setting':
+            import device_settings
+            key,value=device_settings.validate(plan)
+            if self.v.status.in_cleaning or self.v.status.in_returning: raise ValueError('Robot busy')
+            trait=getattr(self.v,{'volume':'sound_volume','dnd':'dnd','child_lock':'child_lock'}[key])
+            await trait.refresh()
+            if key=='volume':
+                if trait.volume is None: raise ValueError('Volume unavailable')
+                await trait.set_volume(value)
+            else:
+                if key=='dnd':
+                    if trait.enabled not in (0,1): raise ValueError('DND unavailable')
+                    if value and not all(type(v) is int and 0<=v<limit for v,limit in [(trait.start_hour,24),(trait.end_hour,24),(trait.start_minute,60),(trait.end_minute,60)]):
+                        raise ValueError('Set a valid DND time window in the official app first')
+                elif trait.lock_status not in (0,1): raise ValueError('Child lock unavailable')
+                await (trait.enable() if value else trait.disable())
+            return 'Setting submitted; refresh to verify'
         if action=='routine':
             import routines
             identifier=routines.validate(plan,await self.v.routines.get_routines())

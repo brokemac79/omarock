@@ -334,6 +334,33 @@ Ui.Panel {
                         }
                         Text {width:parent.width;text:"Import all floors caches saved map images while idle and restores the original map selection. Browsing cached floors never switches the robot. Cleaning still requires the robot’s active map and physical-floor confirmation. Room freshness is not inferred from incomplete history. Cleaning/mode/zone control awaits supervised Saros 20 testing.";color:root.muted;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
                     }
+                    Column {
+                        width:parent.width;spacing:10;visible:root.tab===3
+                        Text {text:"DEVICE SETTINGS";color:Color.foreground;font.family:Style.font.family;font.pixelSize:16}
+                        Text {width:parent.width;text:"Every change needs review and the safety lock. DND uses the robot’s existing time window; edit that window in the official app. Times are robot-local.";color:root.muted;wrapMode:Text.WordWrap;font.pixelSize:11}
+                        Repeater {
+                            model:["volume","dnd","child_lock"]
+                            Column {
+                                required property string modelData
+                                property var setting:(root.report.deviceSettings||{})[modelData]
+                                width:parent.width;spacing:5
+                                Text {text:parent.modelData.replace(/_/g," ")+" · "+(!parent.setting?"Unavailable":parent.modelData==="volume"?parent.setting.value+"%":parent.setting.value?"On":"Off");color:Color.foreground;font.pixelSize:13}
+                                Text {visible:parent.modelData==="dnd" && !!parent.setting;text:parent.setting?"Window "+parent.setting.startHour+":"+String(parent.setting.startMinute).padStart(2,"0")+" – "+parent.setting.endHour+":"+String(parent.setting.endMinute).padStart(2,"0"):"";color:root.muted;font.pixelSize:11}
+                                Row {
+                                    spacing:6
+                                    Repeater {
+                                        model:modelData==="volume"?[0,25,50,75,100]:[true,false]
+                                        RockButton {
+                                            required property var modelData
+                                            text:typeof modelData==="number"?"Review "+modelData+"%":"Review "+(modelData?"On":"Off")
+                                            available:!!parent.parent.setting
+                                            onClicked:{root.pending={action:"setting",plan:{setting:parent.parent.modelData,value:modelData,reviewed:true}};root.actionMessage=""}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     TimedSchedules {width:parent.width;visible:root.tab===5;python:root.python;base:root.base;maps:root.maps}
                     SchedulePane {
                         id: schedule
@@ -356,7 +383,7 @@ Ui.Panel {
                             id:reviewBody
                             anchors{left:parent.left;right:parent.right;top:parent.top;margins:14}
                             spacing:12
-                            Text {text:root.pending && root.pending.action==="clean"?"Review: "+root.current.name+" · "+["Rooms","Whole floor","Zone"][root.scope]+" · "+["Vacuum","Vacuum & mop","Mop"][root.mode]:"Confirm: "+(root.pending?root.pending.action+(root.pending.action==="reset-consumable"?" · "+root.pending.plan.consumable+" · I have replaced/cleaned this part":""):"");color:Color.foreground;font.family:Style.font.family;font.pixelSize:14}
+                            Text {text:root.pending && root.pending.action==="clean"?"Review: "+root.current.name+" · "+["Rooms","Whole floor","Zone"][root.scope]+" · "+["Vacuum","Vacuum & mop","Mop"][root.mode]:root.pending && root.pending.action==="setting"?"Review setting: "+root.pending.plan.setting+" → "+root.pending.plan.value:"Confirm: "+(root.pending?root.pending.action+(root.pending.action==="reset-consumable"?" · "+root.pending.plan.consumable+" · I have replaced/cleaned this part":""):"");color:Color.foreground;font.family:Style.font.family;font.pixelSize:14}
                             RockButton {visible:!!root.pending && root.pending.action==="clean";text:(root.confirmedFloor?"✓ ":"□ ")+"Robot is physically on "+root.current.name;selected:root.confirmedFloor;onClicked:root.confirmedFloor=!root.confirmedFloor}
                             Text {text:root.pending && root.pending.action==="import-maps"?"While idle: briefly select each saved map, cache its image, then restore the original selection. No cleaning.":root.writable?"This will operate your robot. Supervise the first test.":"Safety lock or stale state: preview only. No device command can be sent.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11}
                             RockButton {visible:!!root.pending && !!root.pending.routine;text:((root.pending && root.pending.routine && root.pending.routine.reviewed)?"✓ ":"□ ")+"I checked routine steps and physical floor in the official app";onClicked:{var p=root.pending;p.routine.reviewed=!p.routine.reviewed;root.pending=null;root.pending=p}}
