@@ -42,7 +42,7 @@ Ui.Panel {
     readonly property bool authActive: loginForm.authActive
     onOpenedChanged: {if(!opened && loginForm.authActive)loginForm.cancel()}
     onPendingChanged: { if(pending)Qt.callLater(function(){scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)}) }
-    onReportChanged: { if(floor===-1 && report.activeFloor!==undefined)floor=report.activeFloor }
+    onReportChanged: { if(floor===-1 && report.activeFloor!==undefined)floor=report.activeFloor; if(tab===4 && !planReader.running)planReader.running=true }
     function label(s) { return String(s===undefined || s===null ? "unknown" : s).replace(/_/g," ") }
     function chooseFloor(id) {floor=id;selected=[];zones=[];draft=null;mapCanvas.requestPaint()}
     function chooseRoom(id) {var a=selected.slice();var n=a.indexOf(id);if(n<0)a.push(id);else a.splice(n,1);selected=a;scope=0}
