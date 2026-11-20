@@ -56,3 +56,17 @@ Read-only helper: `~/.local/share/omarock/venv/bin/python omarock.py snapshot`. 
 ## Credits and licensing
 
 Connectivity and parsing: [python-roborock](https://github.com/Python-roborock/python-roborock), under its own license. Design research: [roborock-web](https://github.com/sakerrr/roborock-web) and [saros-dashboard](https://github.com/datori/saros-dashboard). No dashboard source copied. Native UI uses Omarchy’s existing `Ui.BarWidget`, `Ui.Panel` and `Ui.KeyboardPanel` contracts. MIT license covers this project, not third-party dependencies. See `docs/VERIFICATION.md` for exact evidence and outstanding tests.
+
+### Cleaning rhythm (Timeline)
+Native floor-grouped timeline: whole-floor rows plus each room, with independent
+vacuum and mop lanes. Filter by floor; Edit saves a local repeat interval (Off or
+1/2/3/7/14/30 days). Dates are anchored when the plan is saved. A due marker is a
+plan, **not evidence of completed cleaning**. Plans do not automatically dispatch
+or create Roborock timers. `Clean now` opens the Overview selection for review;
+it never bypasses the active-floor/physical-floor checks or control lock.
+
+Imported history currently lacks trustworthy room-and-cleaning-mode attribution;
+last-clean dates therefore remain unknown. Existing floor activity remains under
+History. A future scheduler needs explicit commissioning, sleep/offline recovery,
+physical-floor availability and reliable completion tracking before automation
+can be enabled. Local plans are private (`~/.local/state/omarock/plans.json`).

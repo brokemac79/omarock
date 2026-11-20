@@ -20,10 +20,12 @@ Column {
         RockButton {text:"All floors";selected:root.filterFloor===-1;onClicked:root.filterFloor=-1}
         Repeater {model:root.rows.filter(function(r){return r.room===null});RockButton {required property var modelData;text:modelData.floorName;selected:root.filterFloor===modelData.floor;onClicked:root.filterFloor=modelData.floor}}
     }
-    Row {
-        width:parent.width
-        Item {width:180;height:20}
-        Repeater {model:["−7d","−3d","TODAY","+3d","+7d"];Text {required property string modelData;width:(root.width-180)/5;text:modelData;color:Color.accent;font.family:Style.font.family;font.pixelSize:10}}
+    Item {
+        width:parent.width;height:20
+        Item {
+            x:62;width:Math.max(120,root.width-365);height:20
+            Repeater {model:["−7d","−3d","TODAY","+3d","+7d"];Text {required property string modelData;required property int index;x:index*(parent.width-30)/4;width:40;text:modelData;color:Color.accent;font.family:Style.font.family;font.pixelSize:10}}
+        }
     }
     Repeater {
         model:root.rows.filter(function(r){return root.filterFloor===-1 || root.filterFloor===r.floor})
