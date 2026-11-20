@@ -34,6 +34,9 @@ Ui.Panel {
     readonly property bool writable: report.controlsEnabled===true && !stale && !fetching && !action.running
     readonly property color muted: Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.6)
     signal refreshRequested()
+    signal signedIn()
+    readonly property bool authActive: loginForm.authActive
+    onOpenedChanged: {if(!opened && loginForm.authActive)loginForm.cancel()}
     onPendingChanged: { if(pending)Qt.callLater(function(){scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)}) }
     onReportChanged: { if(floor===-1 && report.activeFloor!==undefined)floor=report.activeFloor }
     function label(s) { return String(s===undefined || s===null ? "unknown" : s).replace(/_/g," ") }
@@ -71,7 +74,7 @@ Ui.Panel {
         stdout: StdioCollector { onStreamFinished: {try{var r=JSON.parse(text);root.actionMessage=r.error||r.status;if(!r.error)root.pending=null}catch(e){root.actionMessage="Command outcome unknown. Check the official app before retrying."}} }
         onExited: function(code) { if(code===0)root.refreshRequested() }
     }
-    function open() { controller.show(); focusTimer.restart() }
+    function open() { if(!report.authPresent)tab=3;controller.show(); focusTimer.restart() }
     Timer { id: focusTimer; interval: 150; onTriggered: {catcher.forceActiveFocus(); if(!focusApp.running)focusApp.running=true} }
     Process { id: focusApp; command: ["hyprctl","dispatch",'hl.dsp.focus({ window = "title:^OmaRock$" })'] }
     FloatingWindow {
@@ -150,7 +153,7 @@ Ui.Panel {
                         Text {
                             id: warning
                             anchors{left:parent.left;right:parent.right;verticalCenter:parent.verticalCenter;leftMargin:12;rightMargin:12}
-                            text: root.lastError ? root.lastError : !root.report.authPresent ? "Desktop sign-in needed. Showing a timestamped snapshot only; no live connection yet." : root.lastError ? root.lastError : root.stale ? "Cached data is stale. Refresh before relying on robot state." : !root.report.controlsEnabled ? "Read-only safety lock · cleaning controls await supervised commissioning." : "Live connection · review every request before sending."
+                            text: root.lastError ? root.lastError : !root.report.authPresent ? "Sign in under Connection to load live robot data. Cached map/status below are not live." : root.lastError ? root.lastError : root.stale ? "Cached data is stale. Refresh before relying on robot state." : !root.report.controlsEnabled ? "Read-only safety lock · cleaning controls await supervised commissioning." : "Live connection · review every request before sending."
                             wrapMode: Text.WordWrap
                             color: Color.accent
                             font.family: Style.font.family
@@ -301,7 +304,15 @@ Ui.Panel {
                         visible:root.tab===3
                         Text {text:"Your Roborock, on your desktop.";color:Color.foreground;font.family:Style.font.family;font.pixelSize:22}
                         Text {width:parent.width;text:"This is a separate native app window, opened from the application launcher or bar icon. Resize, tile or move it between workspaces like any other app. A private Python helper talks to Roborock. No browser, WebView or web server.";color:Color.foreground;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
-                        Text {width:parent.width;text:"Sign in once on this machine using the library’s email-code login:\n\n~/.local/share/omarock/venv/bin/roborock login --email YOUR_EMAIL\n\nThen click Refresh. Credentials stay in ~/.roborock, outside the repository.";color:root.muted;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WrapAnywhere}
+                        LoginPane {
+                            id: loginForm
+                            width:parent.width
+                            python:root.python
+                            base:root.base
+                            signedInAlready:root.report.authPresent===true
+                            refreshing:root.fetching
+                            onSignedIn:{root.signedIn();root.tab=0}
+                        }
                         Text {width:parent.width;text:"Current limitations: only the current floor image is available; other floor maps must be selected in the official app after moving the robot. Room freshness is not inferred from incomplete history. Cleaning/mode/zone control awaits supervised Saros 20 testing.";color:root.muted;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
                     }
                     Rectangle {

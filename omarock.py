@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OmaRock: loopback-only Roborock dashboard and Omarchy bar companion."""
+"""OmaRock native desktop app helper. No web service."""
 import argparse
 import asyncio
 import base64
@@ -7,6 +7,8 @@ import datetime as dt
 import json
 import math
 import os
+import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -177,12 +179,106 @@ async def perform(operation, **kwargs):
         return await (robot.snapshot(**kwargs) if operation=='snapshot' else robot.execute(operation,**kwargs))
     finally: await robot.close()
 
+def validate_email(value):
+    if not isinstance(value,str): raise ValueError('Enter your Roborock account email address.')
+    value=value.strip()
+    if len(value)>254 or not re.fullmatch(r"[^\s@]{1,64}@[^\s@]+\.[^\s@]+",value):
+        raise ValueError('Enter a valid email address.')
+    return value
+
+def validate_code(value):
+    if not isinstance(value,str) or not re.fullmatch(r"[0-9]{6}",value.strip()):
+        raise ValueError('Enter the six-digit email code.')
+    return value.strip()
+
+def write_session_file(path,value):
+    import tempfile
+    path=Path(path)
+    name=None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w',dir=path.parent,prefix='.omarock-session-',delete=False) as stream:
+            name=stream.name
+            os.chmod(name,0o600)
+            json.dump(value,stream)
+        os.replace(name,path)
+        os.chmod(path,0o600)
+    finally:
+        if name and os.path.exists(name):os.unlink(name)
+
+def store_session(user_data,email):
+    from roborock.cli import ConnectionCache, RoborockContext
+    # Same account-cache format as the vendor CLI, atomic write with mode 0600.
+    write_session_file(RoborockContext.roborock_file,ConnectionCache(user_data=user_data,email=email).as_dict())
+
+async def auth_flow(read,emit,client_factory=None,store=None,timeout=300):
+    """Private JSON-lines over stdin/stdout; never echo codes or tokens."""
+    store=store or store_session
+    emit({'state':'ready'})
+    try:
+        request=await asyncio.wait_for(read(),timeout)
+        if not request or request.get('action')=='cancel':
+            emit({'state':'cancelled'});return
+        email=validate_email(request.get('email'))
+        if client_factory is None:
+            from roborock.web_api import RoborockApiClient
+            client_factory=RoborockApiClient
+        client=client_factory(email)
+        emit({'state':'requesting','message':'Requesting your verification code…'})
+        try: await asyncio.wait_for(client.request_code(),45)
+        except Exception:
+            emit({'state':'error','message':'Could not request a code. Check your email and internet connection; if you requested one recently, wait before trying again.'});return
+        emit({'state':'code_sent','message':'Check your email for the six-digit Roborock code.'})
+        for attempt in range(3):
+            request=await asyncio.wait_for(read(),timeout)
+            if not request or request.get('action')=='cancel':
+                emit({'state':'cancelled'});return
+            try:code=validate_code(request.get('code'))
+            except ValueError as error:
+                emit({'state':'code_sent','message':str(error)});continue
+            emit({'state':'verifying','message':'Verifying your code…'})
+            try:user_data=await asyncio.wait_for(client.code_login(code),45)
+            except Exception:
+                emit({'state':'code_sent','message':'Code not accepted or verification unavailable. Check the code and try again, or cancel and request a new one.'});continue
+            finally:code=None
+            try:store(user_data,email)
+            except Exception:
+                emit({'state':'error','message':'Sign-in succeeded, but the session could not be saved. Check permissions for your home directory.'});return
+            emit({'state':'signed_in','message':'Signed in. Loading your robot…'});return
+        emit({'state':'error','message':'Too many unsuccessful attempts. Cancel and request a new code when ready.'})
+    except asyncio.TimeoutError:
+        emit({'state':'expired','message':'Sign-in timed out. Request a new code when ready.'})
+    except ValueError as error:
+        emit({'state':'error','message':str(error)})
+    except Exception:
+        emit({'state':'error','message':'Sign-in could not finish. Cancel and try again.'})
+
+async def auth_stdio():
+    import logging
+    # Never forward vendor authentication logging or exception payloads.
+    logging.disable(logging.CRITICAL)
+    reader=asyncio.StreamReader(limit=4096)
+    protocol=asyncio.StreamReaderProtocol(reader)
+    transport,_=await asyncio.get_running_loop().connect_read_pipe(lambda:protocol,sys.stdin.buffer)
+    async def read():
+        line=await reader.readline()
+        if not line:return None
+        try:value=json.loads(line)
+        except (ValueError,UnicodeError):raise ValueError('Invalid sign-in request')
+        if not isinstance(value,dict):raise ValueError('Invalid sign-in request')
+        return value
+    def emit(value): print(json.dumps(value),flush=True)
+    try:await auth_flow(read,emit)
+    finally:transport.close()
+
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('command',choices=['snapshot','cached','bar','action'])
+    parser.add_argument('command',choices=['snapshot','cached','bar','action','auth'])
     parser.add_argument('--request',default='{}')
     args=parser.parse_args()
     private_dir(STATE);private_dir(CONFIG)
+    if args.command=='auth':
+        os.umask(0o077)
+        asyncio.run(auth_stdio());return
     try:
         if args.command=='snapshot':
             result=asyncio.run(perform('snapshot',include_map=True))

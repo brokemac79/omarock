@@ -19,7 +19,6 @@ Requires Omarchy 4 / Quickshell, uv and Python 3.12+.
 omarchy plugin add https://github.com/brokemac79/omarock.git
 uv venv --python 3.12 ~/.local/share/omarock/venv
 uv pip install --python ~/.local/share/omarock/venv/bin/python 'python-roborock[cli]==7.23.2'
-~/.local/share/omarock/venv/bin/roborock login --email YOUR_EMAIL
 omarchy plugin enable io.github.brokemac79.omarock
 cp ~/.config/omarchy/plugins/io.github.brokemac79.omarock/omarock.desktop ~/.local/share/applications/
 ```
@@ -27,6 +26,8 @@ cp ~/.config/omarchy/plugins/io.github.brokemac79.omarock/omarock.desktop ~/.loc
 Private repo access needs GitHub authentication. Click the robot bar icon or launch **OmaRock** from the application launcher to open the app window. Middle-click or press R in the panel to refresh; Escape closes the review or app window. The Python environment MUST live outside the plugin tree (Omarchy disallows internal symlinks). No auto-start daemon or listening port is installed.
 
 ## Account and private data
+
+**Sign in inside the app:** open OmaRock → Connection, enter your Roborock account email, click **Send email code**, then enter the six-digit code and click **Sign in**. The app refreshes automatically. No terminal or password needed. Cancel or close the window to cancel an unfinished sign-in. Codes are passed over a private stdin pipe, kept only in memory, never logged, stored or put in command-line arguments. Request errors, invalid codes and expiry are shown in the form. Successful credentials replace the vendor cache atomically with mode 0600; an unsuccessful attempt preserves any existing session.
 
 Email-code login uses the vendor library’s credential cache in `~/.roborock`. Never put credentials in the repository or issues. If several devices exist, set `device_id` in private `~/.config/omarock/config.json` (0600). Private snapshots and maps are under `~/.local/state/omarock/` (0700). Robot traffic may use Roborock’s cloud; the native interface itself has no web service or analytics.
 
