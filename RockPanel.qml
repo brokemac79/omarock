@@ -279,6 +279,11 @@ Ui.Panel {
                             }
                         }
                     }
+                    RoomPreferences {
+                        width:parent.width;visible:root.tab===0
+                        python:root.python;base:root.base;floor:root.floor;rooms:root.current.rooms||[]
+                        onUseDefault:function(roomId,cleanMode){root.selected=[roomId];root.scope=0;root.mode=cleanMode==="mop"?2:cleanMode==="vacuum_and_mop"?1:0;root.review()}
+                    }
                     HistoryPane {width:parent.width;visible:root.tab===1;records:root.report.historyArchive||root.report.history||[];maps:root.maps}
                     Column {
                         width:parent.width

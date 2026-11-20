@@ -336,7 +336,7 @@ async def auth_stdio():
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('command',choices=['snapshot','cached','bar','action','auth','import-maps','planner','save-plan','schedules','save-schedule','delete-schedule','scheduler-tick'])
+    parser.add_argument('command',choices=['snapshot','cached','bar','action','auth','import-maps','planner','save-plan','schedules','save-schedule','delete-schedule','scheduler-tick','room-preferences','save-room-preference'])
     parser.add_argument('--request',default='{}')
     args=parser.parse_args()
     private_dir(STATE);private_dir(CONFIG)
@@ -349,7 +349,15 @@ def main():
             lock=open(STATE/'device.lock','w')
             try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
             except BlockingIOError: raise ValueError('Another device operation is running; try again shortly')
-        if args.command in ('schedules','save-schedule','delete-schedule'):
+        if args.command in ('room-preferences','save-room-preference'):
+            import preferences
+            values=load(STATE/'room-preferences.json',{})
+            if args.command=='save-room-preference':
+                value=preferences.validate(json.loads(args.request),load(STATE/'snapshot.json',{}).get('maps',[]))
+                values[preferences.key(value['floor'],value['room'])]=value
+                save(STATE/'room-preferences.json',values)
+            result={'preferences':values}
+        elif args.command in ('schedules','save-schedule','delete-schedule'):
             import scheduler,uuid
             schedules=load(STATE/'schedules.json',{})
             request=json.loads(args.request)
