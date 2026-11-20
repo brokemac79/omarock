@@ -18,15 +18,15 @@ Requires Python 3.12+, uv and Omarchy 4's Quickshell plugin host.
 ```sh
 omarchy plugin add https://github.com/brokemac79/omarock.git
 cd ~/.config/omarchy/plugins/io.github.brokemac79.omarock
-uv venv --python 3.12
-uv pip install --python .venv/bin/python 'python-roborock[cli]==7.23.2'
-.venv/bin/roborock login --email YOUR_EMAIL
+uv venv --python 3.12 ~/.local/share/omarock/venv
+uv pip install --python ~/.local/share/omarock/venv/bin/python 'python-roborock[cli]==7.23.2'
+~/.local/share/omarock/venv/bin/roborock login --email YOUR_EMAIL
 omarchy plugin enable io.github.brokemac79.omarock
 ```
 
 Private repo access requires GitHub authentication. Sign in via email code in your own terminal. Tokens are stored by the library in `~/.roborock`, never in this repo. Select `device_id` in private `~/.config/omarock/config.json` only if multiple robots are present.
 
-Click the bar widget to open. Demo: `.venv/bin/python omarock.py open --demo` (if a live server is already running, stop it first). The backend runs only while its process is running; it is not installed as a system service. No history monitoring while the computer is off.
+Click the bar widget to open. Demo: `~/.local/share/omarock/venv/bin/python omarock.py open --demo` (if a live server is already running, stop it first). The backend runs only while its process is running; it is not installed as a system service. No history monitoring while the computer is off.
 
 ## Safety / commissioning
 

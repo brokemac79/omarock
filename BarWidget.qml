@@ -18,7 +18,7 @@ Ui.BarWidget {
         command: ["python3", root.base+"/omarock.py", "bar"]
         stdout: StdioCollector { onStreamFinished: { try { root.report=JSON.parse(text) } catch(e) { root.report=({}) } } }
     }
-    Process { id: launcher; command: [root.base+"/.venv/bin/python", root.base+"/omarock.py", "open"] }
+    Process { id: launcher; command: [(Quickshell.env("XDG_DATA_HOME") || Quickshell.env("HOME")+"/.local/share")+"/omarock/venv/bin/python", root.base+"/omarock.py", "open"] }
     Timer { interval: 15000; repeat: true; running: true; triggeredOnStart: true; onTriggered: {root.clock=Date.now(); if(!reader.running) reader.running=true} }
     Ui.WidgetButton {
         id: button
