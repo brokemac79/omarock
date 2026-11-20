@@ -31,10 +31,13 @@ Ui.Panel {
     readonly property var maps: report.maps || []
     readonly property var current: maps.find(function(m){return m.id===root.floor}) || ({rooms:[],name:"No floor"})
     readonly property bool activeFloor: floor===report.activeFloor
-    readonly property bool writable: report.controlsEnabled===true && !stale && !fetching && !action.running
+    readonly property bool writable: report.controlsEnabled===true && !stale && !fetching && !action.running && !importing
     readonly property color muted: Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.6)
     signal refreshRequested()
     signal signedIn()
+    signal mapsImported(var value)
+    readonly property bool importing: importer.running
+    readonly property var floorMap: (report.floorMaps || {})[String(floor)] || (activeFloor ? report : ({}))
     readonly property bool authActive: loginForm.authActive
     onOpenedChanged: {if(!opened && loginForm.authActive)loginForm.cancel()}
     onPendingChanged: { if(pending)Qt.callLater(function(){scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)}) }
@@ -45,7 +48,7 @@ Ui.Panel {
     function date(s) { return s ? new Date(s*1000).toLocaleString(Qt.locale("en_GB"),"ddd d MMM HH:mm") : "Unknown" }
     function floorName(id) {var m=maps.find(function(x){return x.id===id});return m?m.name:"Unknown floor"}
     function point(x,y) {
-        var c=report.calibration
+        var c=floorMap.calibration
         if(!c || c.length!==3)throw new Error("Map calibration unavailable")
         var a=c[0],b=c[1],d=c[2],ux=b.map.x-a.map.x,uy=b.map.y-a.map.y,vx=d.map.x-a.map.x,vy=d.map.y-a.map.y,det=ux*vy-uy*vx
         if(Math.abs(det)<0.000001)throw new Error("Invalid calibration")
@@ -73,6 +76,11 @@ Ui.Panel {
         id: action
         stdout: StdioCollector { onStreamFinished: {try{var r=JSON.parse(text);root.actionMessage=r.error||r.status;if(!r.error)root.pending=null}catch(e){root.actionMessage="Command outcome unknown. Check the official app before retrying."}} }
         onExited: function(code) { if(code===0)root.refreshRequested() }
+    }
+    Process {
+        id: importer
+        command: [root.python,root.base+"/omarock.py","import-maps","--request",'{"confirmed":true}']
+        stdout: StdioCollector { onStreamFinished: {try {var value=JSON.parse(text);root.actionMessage=value.error || value.importMessage;if(!value.error)root.mapsImported(value)} catch(e) {root.actionMessage="Map import outcome unknown. Check the selected floor in the official app."}} }
     }
     function open() { if(!report.authPresent)tab=3;controller.show(); focusTimer.restart() }
     Timer { id: focusTimer; interval: 150; onTriggered: {catcher.forceActiveFocus(); if(!focusApp.running)focusApp.running=true} }
@@ -126,15 +134,15 @@ Ui.Panel {
             }
             Flickable {
                 id: scroller
-                anchors {left:sidebar.right;right:parent.right;top:parent.top;bottom:parent.bottom;margins:24}
+                anchors {left:sidebar.right;right:parent.right;top:parent.top;bottom:parent.bottom;margins:16}
                 contentWidth: Math.max(width,800)
-                contentHeight: body.implicitHeight
+                contentHeight: body.implicitHeight+24
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 Column {
                     id: body
                     width: scroller.contentWidth
-                    spacing: 16
+                    spacing: 10
                     Row {
                         width: parent.width
                         Column {
@@ -163,9 +171,10 @@ Ui.Panel {
                     Column {
                         width: parent.width
                         visible: root.tab===0
-                        spacing: 14
+                        spacing: 8
                         Row {
                             spacing: 6
+                            RockButton {text:root.importing?"Importing…":"Import all floors";available:!root.fetching && !root.importing && !root.authActive && !action.running && !!root.report.authPresent;onClicked:root.pending={action:"import-maps"}}
                             Repeater {model:root.maps;RockButton {required property var modelData;text:modelData.name+(modelData.id===root.report.activeFloor?" •":"");selected:root.floor===modelData.id;onClicked:root.chooseFloor(modelData.id)}}
                         }
                         Row {
@@ -176,7 +185,7 @@ Ui.Panel {
                                 spacing: 10
                                 Rectangle {
                                     width: parent.width
-                                    height: Math.min(400,width*0.65)
+                                    height: Math.min(360,width*0.65,Math.max(210,scroller.height-245))
                                     radius: 7
                                     color: Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.045)
                                     border.color: Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.12)
@@ -184,7 +193,7 @@ Ui.Panel {
                                         id: mapImage
                                         anchors.fill: parent
                                         anchors.margins: 8
-                                        source: root.activeFloor ? root.report.mapImage || "" : ""
+                                        source: root.floorMap.mapImage || ""
                                         fillMode: Image.PreserveAspectFit
                                         cache: false
                                         onStatusChanged:mapCanvas.requestPaint()
@@ -193,7 +202,7 @@ Ui.Panel {
                                         anchors.centerIn:parent
                                         width:parent.width-60
                                         visible:mapImage.status!==Image.Ready
-                                        text:root.activeFloor?"No map loaded":"Browsing saved floor. Select this floor in the Roborock app after moving the robot to it."
+                                        text:"No cached map for this floor. Use Import all floors while the robot is idle."
                                         horizontalAlignment:Text.AlignHCenter
                                         wrapMode:Text.WordWrap
                                         font.family:Style.font.family
@@ -233,7 +242,7 @@ Ui.Panel {
                                 }
                                 Row {
                                     width:parent.width
-                                    Text {width:parent.width-110;text:root.report.mapAt?"Map captured "+new Date(root.report.mapAt).toLocaleTimeString(Qt.locale("en_GB"),"HH:mm"):"Robot-reported map";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
+                                    Text {width:parent.width-110;text:root.floorMap.mapAt?"Map captured "+new Date(root.floorMap.mapAt).toLocaleTimeString(Qt.locale("en_GB"),"HH:mm"):"Robot-reported map";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
                                     RockButton {text:"Clear zones";onClicked:{root.zones=[];mapCanvas.requestPaint()}}
                                 }
                                 Flow {
@@ -244,10 +253,10 @@ Ui.Panel {
                             }
                             Column {
                                 width:265
-                                spacing:12
+                                spacing:6
                                 Text {text:root.label(root.report.state);color:Color.foreground;font.family:Style.font.family;font.pixelSize:22}
-                                Text {text:root.report.battery===undefined?"—":root.report.battery+"%";color:Color.accent;font.family:Style.font.family;font.pixelSize:36;font.bold:true}
-                                Text {text:"Clean water · "+root.label(root.report.cleanWater)+"\nDirty water · "+root.label(root.report.dirtyWater);color:Color.foreground;font.family:Style.font.family;font.pixelSize:11;lineHeight:1.5}
+                                Text {text:root.report.battery===undefined?"—":root.report.battery+"%";color:Color.accent;font.family:Style.font.family;font.pixelSize:28;font.bold:true}
+                                Text {text:"Clean water · "+root.label(root.report.cleanWater)+"\nDirty water · "+root.label(root.report.dirtyWater);color:Color.foreground;font.family:Style.font.family;font.pixelSize:11;lineHeight:1.2}
                                 Text {width:parent.width;text:"Tank flags, not fill levels.\nWash: "+(root.report.washing===0?"idle":root.label(root.report.washing))+" · Dry: "+(root.report.drying===0?"idle":root.label(root.report.drying));color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Row {spacing:5;Repeater {model:["Rooms","Floor","Zone"];RockButton {required property string modelData;required property int index;text:modelData;selected:root.scope===index;onClicked:{root.scope=index;if(index===1)root.passes=1}}}}
                                 Text {text:"CLEANING MODE";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
@@ -313,7 +322,7 @@ Ui.Panel {
                             refreshing:root.fetching
                             onSignedIn:{root.signedIn();root.tab=0}
                         }
-                        Text {width:parent.width;text:"Current limitations: only the current floor image is available; other floor maps must be selected in the official app after moving the robot. Room freshness is not inferred from incomplete history. Cleaning/mode/zone control awaits supervised Saros 20 testing.";color:root.muted;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
+                        Text {width:parent.width;text:"Import all floors caches saved map images while idle and restores the original map selection. Browsing cached floors never switches the robot. Cleaning still requires the robot’s active map and physical-floor confirmation. Room freshness is not inferred from incomplete history. Cleaning/mode/zone control awaits supervised Saros 20 testing.";color:root.muted;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
                     }
                     Rectangle {
                         width:parent.width
@@ -328,8 +337,8 @@ Ui.Panel {
                             spacing:12
                             Text {text:root.pending && root.pending.plan?"Review: "+root.current.name+" · "+["Rooms","Whole floor","Zone"][root.scope]+" · "+["Vacuum","Vacuum & mop","Mop"][root.mode]:"Confirm: "+(root.pending?root.pending.action:"");color:Color.foreground;font.family:Style.font.family;font.pixelSize:14}
                             RockButton {visible:!!root.pending && !!root.pending.plan;text:(root.confirmedFloor?"✓ ":"□ ")+"Robot is physically on "+root.current.name;selected:root.confirmedFloor;onClicked:root.confirmedFloor=!root.confirmedFloor}
-                            Text {text:root.writable?"This will operate your robot. Supervise the first test.":"Safety lock or stale state: preview only. No device command can be sent.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11}
-                            Row {spacing:10;RockButton {text:"Cancel";onClicked:root.pending=null} RockButton {text:action.running?"Sending…":"Send to robot";primary:true;available:root.writable && (!root.pending || !root.pending.plan || root.confirmedFloor);onClicked:root.submit()}}
+                            Text {text:root.pending && root.pending.action==="import-maps"?"While idle: briefly select each saved map, cache its image, then restore the original selection. No cleaning.":root.writable?"This will operate your robot. Supervise the first test.":"Safety lock or stale state: preview only. No device command can be sent.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11}
+                            Row {spacing:10;RockButton {text:"Cancel";onClicked:root.pending=null} RockButton {text:root.pending && root.pending.action==="import-maps"?"Import maps":action.running?"Sending…":"Send to robot";primary:true;available:root.pending && root.pending.action==="import-maps"?!root.fetching && !root.importing:root.writable && (!root.pending || !root.pending.plan || root.confirmedFloor);onClicked:{if(root.pending.action==="import-maps"){root.pending=null;root.actionMessage="Importing saved floors…";importer.running=true}else root.submit()}}}
                         }
                     }
                     Text {width:parent.width;text:root.actionMessage;visible:text!=="";color:Color.accent;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}

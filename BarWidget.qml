@@ -21,7 +21,7 @@ Ui.BarWidget {
     function close() { panel.close() }
     function toggle() { opened ? close() : open() }
     function closeForPopoutSwitch() { panel.closeForPopoutSwitch() }
-    function refresh() { if(panel.authActive)return; if(!fetcher.running && report.authPresent) fetcher.running=true; else if(!reader.running) reader.running=true }
+    function refresh() { if(panel.authActive || panel.importing)return; if(!fetcher.running && report.authPresent) fetcher.running=true; else if(!reader.running) reader.running=true }
     Process {
         id: reader
         command: ["/usr/bin/python3",root.base+"/omarock.py","cached"]
@@ -54,6 +54,7 @@ Ui.BarWidget {
         python: root.python
         base: root.base
         onRefreshRequested: root.refresh()
+        onMapsImported: function(value) {value.authPresent=true;root.report=value;root.lastError=""}
         onSignedIn: {root.report=Object.assign({},root.report,{authPresent:true});root.lastError="";root.refresh()}
     }
 }

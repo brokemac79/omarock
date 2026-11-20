@@ -118,33 +118,82 @@ class Robot:
                                     result['history'].append({k:rec.get(k) for k in ['begin','end','duration','area','complete','map_flag','area_ids','wash_count','clean_type']})
                         except Exception: errors.append('One history record unavailable')
             except Exception: errors.append(label+' unavailable')
-        old=load(STATE/'snapshot.json',{})
-        if include_map or old.get('activeFloor') != result['activeFloor'] or not old.get('mapImage'):
+        cached=load(STATE/'floor-maps.json',{})
+        key=str(result['activeFloor'])
+        if include_map or key not in cached:
             try:
-                await self.v.map_content.refresh()
-                content=self.v.map_content
-                if content.image_content:
-                    from PIL import Image, ImageChops
-                    import io
-                    image=Image.open(io.BytesIO(content.image_content)).convert('RGB')
-                    bg=Image.new('RGB',image.size,image.getpixel((0,0)))
-                    bounds=ImageChops.difference(image,bg).getbbox()
-                    calibration=content.map_data.calibration()
-                    if bounds:
-                        left,top,right,bottom=bounds
-                        left=max(0,left-40);top=max(0,top-40)
-                        image=image.crop((left,top,min(image.width,right+40),min(image.height,bottom+40)))
-                        for point in calibration or []:
-                            point['map']['x']-=left;point['map']['y']-=top
-                    out=io.BytesIO();image.save(out,format='PNG')
-                    result['mapImage']='data:image/png;base64,'+base64.b64encode(out.getvalue()).decode()
-                    result['calibration']=calibration
+                cached[key]=await self.capture_map()
+                save(STATE/'floor-maps.json',cached)
             except Exception: errors.append('Map unavailable')
-        elif old.get('mapImage'):
-            result['mapImage']=old['mapImage'];result['calibration']=old.get('calibration');result['mapAt']=old.get('mapAt',old.get('at'))
-        if include_map and 'mapImage' in result: result['mapAt']=result['at']
+        result['floorMaps']=cached
+        result.update(cached.get(key,{}))
         result['warnings']=errors
         return result
+    async def capture_map(self):
+        result={}
+        await self.v.map_content.refresh()
+        content=self.v.map_content
+        if content.image_content:
+            from PIL import Image, ImageChops
+            import io
+            image=Image.open(io.BytesIO(content.image_content)).convert('RGB')
+            bg=Image.new('RGB',image.size,image.getpixel((0,0)))
+            bounds=ImageChops.difference(image,bg).getbbox()
+            calibration=content.map_data.calibration()
+            if bounds:
+                left,top,right,bottom=bounds
+                left=max(0,left-40);top=max(0,top-40)
+                image=image.crop((left,top,min(image.width,right+40),min(image.height,bottom+40)))
+                for point in calibration or []:
+                    point['map']['x']-=left;point['map']['y']-=top
+            out=io.BytesIO();image.save(out,format='PNG')
+            result['mapImage']='data:image/png;base64,'+base64.b64encode(out.getvalue()).decode()
+            result['calibration']=calibration
+        if not result.get('mapImage'): raise ValueError('Map image unavailable')
+        result['mapAt']=now()
+        return result
+
+    async def idle(self):
+        await self.v.status.refresh()
+        if self.v.status.in_cleaning or self.v.status.in_returning or enum_name(self.v.status.state) not in ('charging','idle','fully_charged'):
+            raise ValueError('Map import requires an idle or charging robot')
+
+    async def select_map(self, floor):
+        await self.idle()
+        await self.v.maps.set_current_map(floor)
+        await asyncio.sleep(3)
+        await self.v.status.refresh()
+        if self.v.status.current_map != floor: raise ValueError('Map selection not confirmed')
+
+    async def import_maps(self):
+        await self.idle()
+        original=self.v.status.current_map
+        await self.v.maps.refresh()
+        ids=[m['mapFlag'] for m in self.v.maps.as_dict().get('mapInfo',[])]
+        if type(original) is not int or original not in ids: raise ValueError('Original map is unknown; import cancelled')
+        cached=load(STATE/'floor-maps.json',{})
+        failures=[]
+        try:
+            for floor in ids:
+                try:
+                    await self.select_map(floor)
+                    cached[str(floor)]=await self.capture_map()
+                    save(STATE/'floor-maps.json',cached)
+                except Exception as error:
+                    failures.append('Floor '+str(floor)+': '+str(error)[:100])
+                    break
+        finally:
+            try:
+                await self.v.status.refresh()
+                if self.v.status.current_map != original: await self.select_map(original)
+                await self.v.status.refresh()
+                if self.v.status.current_map != original: raise ValueError('Original map not confirmed')
+            except Exception as error:
+                raise ValueError('Import stopped. Original floor restoration could not be confirmed: '+str(error)[:100])
+        result=await self.snapshot(include_map=True)
+        result['importMessage']=('Imported '+str(len(cached))+' floor maps; original selection restored.' if not failures else '; '.join(failures)+'; original selection restored.')
+        return result
+
     async def execute(self, action, plan=None):
         if self.config.get('allow_control') is not True: raise ValueError('Control locked. Explicitly enable allow_control in your private config after supervised testing')
         await self.v.status.refresh()
@@ -176,7 +225,9 @@ async def perform(operation, **kwargs):
     robot=Robot()
     try:
         await robot.connect()
-        return await (robot.snapshot(**kwargs) if operation=='snapshot' else robot.execute(operation,**kwargs))
+        if operation=='snapshot': return await robot.snapshot(**kwargs)
+        if operation=='import-maps': return await robot.import_maps()
+        return await robot.execute(operation,**kwargs)
     finally: await robot.close()
 
 class AuthInputError(ValueError):
@@ -275,7 +326,7 @@ async def auth_stdio():
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('command',choices=['snapshot','cached','bar','action','auth'])
+    parser.add_argument('command',choices=['snapshot','cached','bar','action','auth','import-maps'])
     parser.add_argument('--request',default='{}')
     args=parser.parse_args()
     private_dir(STATE);private_dir(CONFIG)
@@ -283,7 +334,16 @@ def main():
         os.umask(0o077)
         asyncio.run(auth_stdio());return
     try:
-        if args.command=='snapshot':
+        if args.command in ('snapshot','import-maps','action'):
+            import fcntl
+            lock=open(STATE/'device.lock','w')
+            try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            except BlockingIOError: raise ValueError('Another device operation is running; try again shortly')
+        if args.command=='import-maps':
+            if json.loads(args.request).get('confirmed') is not True: raise ValueError('Explicit map-import confirmation required')
+            result=asyncio.run(perform('import-maps'))
+            save(STATE/'snapshot.json',result)
+        elif args.command=='snapshot':
             result=asyncio.run(perform('snapshot',include_map=True))
             save(STATE/'snapshot.json',result)
         elif args.command=='action':
