@@ -1,63 +1,56 @@
 # OmaRock
 
-An independent Roborock companion for Omarchy: a theme-aware native bar widget plus a loopback-only map and control dashboard. **Early alpha, not affiliated with Roborock.** MIT licensed. Private development repository for now.
+**A native Roborock plugin for Omarchy.** The bar widget opens a theme-aware QML map-and-control panel directly inside Omarchy’s Quickshell process. **No browser, WebView or web server.** Independent community project, not affiliated with Roborock. MIT licensed; private early-alpha development.
 
 ## Features
 
-- Robot-reported status, battery and dock tank flags (not water levels).
-- Saved floors and room names, current floor map and cleaning route.
-- Rooms / whole-floor / rectangular-zone planning, cleaning mode and passes.
-- Native Omarchy bar entry opens a responsive dashboard.
-- Cleaning history with honest unknown-room labels and maintenance hours.
-- Control is locked by default; explicit configuration and per-action confirmation are required.
+- Native bar status and a keyboard-accessible QML panel with Overview / History / Maintenance / Connection.
+- Three-floor browsing, named room selection, current floor map and robot-reported cleaning route.
+- Rooms / whole-floor / rectangular-zone cleaning plans; vacuum, mop or both; repeat passes for rooms/zones.
+- Battery, washing/drying flags, clean/dirty tank flags (not fill levels), consumable hours and recent runs.
+- Explicit read-only safety lock by default. Confirmation and physical-floor guard before any action.
+- Snapshot timestamps and stale-state warnings. Unknown room history remains unknown.
 
-## Install on Omarchy
+## Install
 
-Requires Python 3.12+, uv and Omarchy 4's Quickshell plugin host.
+Requires Omarchy 4 / Quickshell, uv and Python 3.12+.
 
 ```sh
 omarchy plugin add https://github.com/brokemac79/omarock.git
-cd ~/.config/omarchy/plugins/io.github.brokemac79.omarock
 uv venv --python 3.12 ~/.local/share/omarock/venv
 uv pip install --python ~/.local/share/omarock/venv/bin/python 'python-roborock[cli]==7.23.2'
 ~/.local/share/omarock/venv/bin/roborock login --email YOUR_EMAIL
 omarchy plugin enable io.github.brokemac79.omarock
 ```
 
-Private repo access requires GitHub authentication. Sign in via email code in your own terminal. Tokens are stored by the library in `~/.roborock`, never in this repo. Select `device_id` in private `~/.config/omarock/config.json` only if multiple robots are present.
+Private repo access needs GitHub authentication. Click the robot bar icon to open the native panel. Middle-click or press R in the panel to refresh; Escape closes the review or panel. The Python environment MUST live outside the plugin tree (Omarchy disallows internal symlinks). No auto-start daemon or listening port is installed.
 
-Click the bar widget to open. Demo: `~/.local/share/omarock/venv/bin/python omarock.py open --demo` (if a live server is already running, stop it first). The backend runs only while its process is running; it is not installed as a system service. No history monitoring while the computer is off.
+## Account and private data
+
+Email-code login uses the vendor library’s credential cache in `~/.roborock`. Never put credentials in the repository or issues. If several devices exist, set `device_id` in private `~/.config/omarock/config.json` (0600). Private snapshots and maps are under `~/.local/state/omarock/` (0700). Robot traffic may use Roborock’s cloud; the native interface itself has no web service or analytics.
 
 ## Safety / commissioning
 
-Until physically supervised Saros 20 testing, keep control disabled. To commission, create `~/.config/omarock/config.json` with `{"allow_control": true}`, mode 0600, then restart the backend. Requests require bearer authentication, same-origin POST, selected-floor confirmation, valid room IDs, battery >=20%, no reported error, and an idle robot. The plugin never switches floor maps automatically. Move the robot and select its floor using the official app before using another floor.
+Live Saros 20 actuation is **not physically verified**. Leave the default lock on until a supervised test. To explicitly commission, set `{"allow_control": true}` in the private config above and refresh the panel. The default is false. No configuration file or token is shipped in the repo.
 
-Mode setting and starting are two separate API operations: failure between them may leave settings changed. A timeout is **uncertain**, not proof nothing happened; check the official app before retrying. Submitted requests are not completed cleans. Whole-floor repeat passes are not implemented; select rooms for repeats. Zone calibration is mathematically mapped from parsed map calibration but physically unverified.
+Cleaning requires confirming the robot’s physical floor, valid current map and room IDs, battery >=20%, no reported errors and no active cleaning/returning task. The plugin does not switch maps automatically. Move the robot and select its floor using the official app first. Whole-floor repeats are not implemented; select rooms for repeats.
 
-## Security
+A request is **submitted**, never assumed complete. Mode setting and starting are separate API operations: failure in between may leave settings changed. Timeouts are uncertain; check the official app before retrying. Zone coordinate transformation uses the parsed map’s three-point calibration but needs a physical supervised test. Pause/dock are also gated until commissioning.
 
-Server binds 127.0.0.1:18776 only. Per-run bearer token goes in the initial URL fragment, then browser sessionStorage. Private runtime files are under `~/.local/state/omarock` (0700). No CORS, strict Host/Origin checks and restrictive CSP. Do not expose the port or put tokens in screenshots/issues. Other applications running as your user can read your files; this is not a sandbox. Browser access is trusted local-user access. Do not run untrusted plugins.
+## Honest limitations
 
-The UI makes no secret/API requests to external websites. Device/library traffic may use Roborock cloud. Map images are private home data; runtime state is gitignored and outside the checkout. No analytics.
-
-## Verification status
-
-- Saros 20 status, maps, room names, raw cleaning records and consumables were verified from a VPS integration before this project.
-- Clean tank removal/replacement flips its flag. Dirty tank removal is not physically verified.
-- Project-specific live backend, desktop rendering and tests: see `docs/VERIFICATION.md`.
-- No cleaning, map editing, dock cycles or robot settings changes were performed during development.
-- Existing historical records can omit room IDs. No invented per-room freshness or reconstruction from unavailable historical paths.
+Only the active floor’s image is available; other saved floor names/rooms can be browsed without pretending their image is current. History may omit room IDs. No fabricated last-cleaned room dates or freshness layer. Maps use real robot-rendered data, not the illustrative furniture from the design concept. Full native standalone desktop window/launcher can be added later; v0.1 is a native Omarchy bar plugin and attached panel.
 
 ## Development
 
 ```sh
 python3 -m unittest discover -s tests -v
-node --check web/app.js
+python3 -m py_compile omarock.py
 omarchy plugin validate .
 ```
 
-No production mock data fallback: demo mode is explicitly marked and commands are rejected. v0.1 uses a polling backend; live snapshots refresh roughly every minute plus device-request latency. The UI labels stale data.
+Read-only helper: `~/.local/share/omarock/venv/bin/python omarock.py snapshot`. The pure-stdlib `cached` command reads private state without connecting. All device code uses python-roborock 7.23.2.
 
-## Credits
+## Credits and licensing
 
-Connectivity and parsing: [python-roborock](https://github.com/Python-roborock/python-roborock) (its own license). Design research: [roborock-web](https://github.com/sakerrr/roborock-web) and [saros-dashboard](https://github.com/datori/saros-dashboard). No source copied from those dashboards. Omarchy UI contracts and installed plugin patterns informed the bar integration. Own MIT license does not replace dependency licenses.
+Connectivity and parsing: [python-roborock](https://github.com/Python-roborock/python-roborock), under its own license. Design research: [roborock-web](https://github.com/sakerrr/roborock-web) and [saros-dashboard](https://github.com/datori/saros-dashboard). No dashboard source copied. Native UI uses Omarchy’s existing `Ui.BarWidget`, `Ui.Panel` and `Ui.KeyboardPanel` contracts. MIT license covers this project, not third-party dependencies. See `docs/VERIFICATION.md` for exact evidence and outstanding tests.

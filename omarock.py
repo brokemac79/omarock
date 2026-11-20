@@ -4,23 +4,14 @@ import argparse
 import asyncio
 import base64
 import datetime as dt
-import fcntl
 import json
 import math
 import os
 from pathlib import Path
-import secrets
-import subprocess
-import sys
-import threading
-import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 STATE = Path(os.environ.get('XDG_STATE_HOME', Path.home()/'.local/state'))/'omarock'
 CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home()/'.config'))/'omarock'
-PORT = 18776
 
 def private_dir(path):
     path.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -49,9 +40,9 @@ def validate_plan(plan, snapshot):
     floor = plan.get('floor')
     maps = snapshot.get('maps', [])
     selected = next((m for m in maps if m['id'] == floor), None)
-    if selected is None: raise ValueError('Unknown floor')
+    if type(floor) is not int or selected is None: raise ValueError('Unknown floor')
     if floor != snapshot.get('activeFloor'): raise ValueError('Robot must already be on this floor; move it and select its map in the Roborock app first')
-    if plan.get('confirmedFloor') != floor: raise ValueError('Confirm the physical floor')
+    if type(plan.get('confirmedFloor')) is not int or plan.get('confirmedFloor') != floor: raise ValueError('Confirm the physical floor')
     if plan.get('mode') not in ('vacuum', 'mop', 'vacuum_and_mop'): raise ValueError('Unsupported cleaning mode')
     passes = plan.get('passes', 1)
     if type(passes) is not int or not 1 <= passes <= 3: raise ValueError('Passes must be 1–3')
@@ -131,8 +122,21 @@ class Robot:
                 await self.v.map_content.refresh()
                 content=self.v.map_content
                 if content.image_content:
-                    result['mapImage']='data:image/png;base64,'+base64.b64encode(content.image_content).decode()
-                    result['calibration']=content.map_data.calibration()
+                    from PIL import Image, ImageChops
+                    import io
+                    image=Image.open(io.BytesIO(content.image_content)).convert('RGB')
+                    bg=Image.new('RGB',image.size,image.getpixel((0,0)))
+                    bounds=ImageChops.difference(image,bg).getbbox()
+                    calibration=content.map_data.calibration()
+                    if bounds:
+                        left,top,right,bottom=bounds
+                        left=max(0,left-40);top=max(0,top-40)
+                        image=image.crop((left,top,min(image.width,right+40),min(image.height,bottom+40)))
+                        for point in calibration or []:
+                            point['map']['x']-=left;point['map']['y']-=top
+                    out=io.BytesIO();image.save(out,format='PNG')
+                    result['mapImage']='data:image/png;base64,'+base64.b64encode(out.getvalue()).decode()
+                    result['calibration']=calibration
             except Exception: errors.append('Map unavailable')
         elif old.get('mapImage'):
             result['mapImage']=old['mapImage'];result['calibration']=old.get('calibration');result['mapAt']=old.get('mapAt',old.get('at'))
@@ -173,87 +177,26 @@ async def perform(operation, **kwargs):
         return await (robot.snapshot(**kwargs) if operation=='snapshot' else robot.execute(operation,**kwargs))
     finally: await robot.close()
 
-class App:
-    def __init__(self,demo=False):
-        self.demo=demo; self.lock=threading.Lock(); self.busy=False
-        self.snapshot=load(STATE/'snapshot.json',{'name':'OmaRock','maps':[],'history':[],'warnings':['Sign in to Roborock to connect.'],'controlsEnabled':False})
-        if demo: self.snapshot=load(ROOT/'tests/demo.json')
-    def refresh(self,with_map=True):
-        if not self.lock.acquire(False): return
-        self.busy=True
-        try:
-            if not self.demo:
-                self.snapshot=asyncio.run(perform('snapshot',include_map=with_map));save(STATE/'snapshot.json',self.snapshot)
-        except Exception as e:
-            self.snapshot=dict(self.snapshot,connectionError=type(e).__name__+': '+str(e)[:240])
-        finally: self.busy=False;self.lock.release()
-
-def serve(demo=False):
-    private_dir(STATE);token=secrets.token_urlsafe(32);app=App(demo)
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self,*args): pass # Never log query strings/credentials.
-        def output(self,code,data,kind='application/json'):
-            b=json.dumps(data).encode() if kind=='application/json' else data
-            self.send_response(code);self.send_header('Content-Type',kind);self.send_header('Content-Length',str(len(b)))
-            self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff')
-            self.send_header('Content-Security-Policy',"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'")
-            self.end_headers();self.wfile.write(b)
-        def do_GET(self):
-            if self.headers.get('Host') != f'127.0.0.1:{PORT}':return self.output(403,{'error':'Invalid host'})
-            path=urlparse(self.path).path
-            if path.startswith('/api/'):
-                if self.headers.get('Authorization')!='Bearer '+token:return self.output(401,{'error':'Unauthorized'})
-                if path=='/api/snapshot':return self.output(200,dict(app.snapshot,busy=app.busy))
-                return self.output(404,{'error':'Not found'})
-            file={'/':'index.html','/app.js':'app.js','/style.css':'style.css'}.get(path)
-            if not file:return self.output(404,{'error':'Not found'})
-            return self.output(200,(ROOT/'web'/file).read_bytes(),{'index.html':'text/html; charset=utf-8','app.js':'text/javascript','style.css':'text/css'}[file])
-        def do_POST(self):
-            if self.headers.get('Host')!=f'127.0.0.1:{PORT}' or self.headers.get('Origin')!=f'http://127.0.0.1:{PORT}' or self.headers.get('Authorization')!='Bearer '+token:return self.output(403,{'error':'Forbidden'})
-            try:
-                n=int(self.headers.get('Content-Length','0'))
-                if not 0<n<16384:raise ValueError('Invalid request size')
-                data=json.loads(self.rfile.read(n));path=urlparse(self.path).path
-                if path=='/api/refresh':
-                    threading.Thread(target=app.refresh,daemon=True).start();return self.output(202,{'status':'refreshing'})
-                if path!='/api/action':return self.output(404,{'error':'Not found'})
-                if app.demo:raise ValueError('Demo mode never sends robot commands')
-                if data.get('confirmed') is not True:raise ValueError('Explicit confirmation required')
-                if not app.lock.acquire(False):raise ValueError('Refresh or command in progress')
-                try:result=asyncio.run(perform(data.get('action'),plan=data.get('plan')))
-                finally:app.lock.release()
-                return self.output(200,{'status':'submitted; completion unverified','result':str(result)[:200]})
-            except Exception as e:return self.output(400,{'error':str(e)[:250]})
-    server=ThreadingHTTPServer(('127.0.0.1',PORT),Handler)
-    save(STATE/'server.json',{'pid':os.getpid(),'port':PORT,'token':token,'demo':demo})
-    def poll():
-        while True:
-            app.refresh(True);time.sleep(60)
-    threading.Thread(target=poll,daemon=True).start()
-    server.serve_forever()
-
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('command',choices=['serve','open','bar','snapshot']);parser.add_argument('--demo',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser()
+    parser.add_argument('command',choices=['snapshot','cached','bar','action'])
+    parser.add_argument('--request',default='{}')
+    args=parser.parse_args()
     private_dir(STATE);private_dir(CONFIG)
-    if args.command=='serve':serve(args.demo)
-    elif args.command=='snapshot':
-        result=asyncio.run(perform('snapshot',include_map=True));save(STATE/'snapshot.json',result);print(json.dumps(result))
-    elif args.command=='bar':
-        value=load(STATE/'snapshot.json',{});print(json.dumps({k:value.get(k) for k in ['at','name','battery','state','cleanWater','dirtyWater']}))
-    else:
-        import urllib.request
-        with open(STATE/'start.lock','w') as lock:
-            fcntl.flock(lock,fcntl.LOCK_EX)
-            info=load(STATE/'server.json',{});healthy=False
-            try:
-                req=urllib.request.Request(f'http://127.0.0.1:{PORT}/api/snapshot',headers={'Authorization':'Bearer '+info.get('token','')})
-                urllib.request.urlopen(req,timeout=2).close();healthy=True
-            except Exception:pass
-            if not healthy:
-                with open(STATE/'server.log','a') as log:subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'serve']+(['--demo'] if args.demo else []),stdout=log,stderr=log,start_new_session=True)
-                for _ in range(40):
-                    time.sleep(.1);info=load(STATE/'server.json',{})
-                    if info.get('pid') and Path('/proc/'+str(info['pid'])).exists():break
-                else:raise SystemExit('Server did not start; inspect private server.log')
-        subprocess.Popen(['xdg-open',f'http://127.0.0.1:{PORT}/#'+info['token']],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    try:
+        if args.command=='snapshot':
+            result=asyncio.run(perform('snapshot',include_map=True))
+            save(STATE/'snapshot.json',result)
+        elif args.command=='action':
+            request=json.loads(args.request)
+            if request.get('confirmed') is not True: raise ValueError('Explicit confirmation required')
+            result={'status':'submitted; completion unverified', 'result':str(asyncio.run(perform(request.get('action'),plan=request.get('plan'))))[:200]}
+        else:
+            result=load(STATE/'snapshot.json',{})
+            result['authPresent']=(Path.home()/'.roborock').exists()
+            if args.command=='bar':result={k:result.get(k) for k in ['at','name','battery','state','cleanWater','dirtyWater']}
+        print(json.dumps(result))
+    except Exception as error:
+        print(json.dumps({'error':type(error).__name__+': '+str(error)[:240]}))
+        raise SystemExit(1)
 if __name__=='__main__':main()

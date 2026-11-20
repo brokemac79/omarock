@@ -1,0 +1,19 @@
+# Verification — 20 November 2026
+
+The first browser-based implementation was rejected by Martin. It is superseded by a native QML plugin and attached Omarchy panel. No browser/server routes remain in the current implementation. Prior web UI checks do NOT count as native UI verification.
+
+## Backend
+- 16 pure validation tests passed (room IDs, wrong floor, confirmation, mode, passes, zone bounds and missing calibration).
+- Project helper connected read-only to real Saros 20 on VPS using existing login: battery/dock flags, three saved floors and room names, current map and three-point calibration, ten raw cleaning records, consumables. No warnings.
+- Clean tank removal/replacement flags were physically tested earlier; dirty tank detection remains assumed, not physically tested.
+- No cleaning, movement, map switching, settings writes or dock cycles during development.
+
+## Desktop
+- Surface Pro 3, Omarchy 4.5.0-3. Python 3.12 environment outside plugin folder.
+- Native plugin schema and actual QML rendering/interactions: recorded after final deployment below.
+- Desktop has no Roborock login yet. Cached snapshot copied privately from existing VPS read-only fetch, NOT a live desktop connection. No account tokens copied.
+
+## Not verified
+- Saros physical room/floor/zone cleaning, mode setting and pause/dock. Default lock remains on.
+- Other-floor image retrieval; historical per-room coverage when room IDs are absent.
+- Marketplace packaging/submission. Repository remains private.
