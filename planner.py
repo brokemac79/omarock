@@ -30,5 +30,12 @@ def timeline(maps,history,plans,clock=None):
                 anchor=plan.get('anchor',clock)
                 due=anchor+days*86400 if days else None
                 lanes.append({'mode':mode,'days':days,'due':due,'last':None,'evidenceRuns':len(evidence),'status':'overdue' if due and due<clock else 'planned' if due else 'not scheduled'})
-            rows.append({'floor':floor['id'],'room':rid,'name':room['name'] if room else floor['name']+' · whole floor','floorName':floor['name'],'lanes':lanes})
+            activity=[]
+            if rid is None:
+                for record in sorted(history,key=lambda r:r.get('begin') or 0,reverse=True):
+                    if record.get('map_flag') != floor['id']: continue
+                    begin=record.get('begin')
+                    if type(begin) not in (int,float) or begin<=0: continue
+                    activity.append({k:record.get(k) for k in ('begin','end','duration','area','complete')})
+            rows.append({'activity':activity,'floor':floor['id'],'room':rid,'name':room['name'] if room else floor['name']+' · whole floor','floorName':floor['name'],'lanes':lanes})
     return rows

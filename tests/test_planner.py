@@ -21,3 +21,12 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(planner.validate({'floor':0,'room':16,'mode':'mop','days':7},self.maps)['days'],7)
         for change in [{'room':99},{'floor':True},{'days':-1},{'days':True},{'mode':'both'}]:
             with self.assertRaises(ValueError): planner.validate(dict(floor=0,room=16,mode='mop',days=7)|change,self.maps)
+
+    def test_history_only_on_its_floor_not_rooms(self):
+        records=[{'map_flag':0,'begin':100,'end':200,'duration':100,'area':1000000,'complete':1}, {'map_flag':1,'begin':300,'complete':0}, {'map_flag':99,'begin':400}, {'map_flag':0,'begin':None}]
+        rows=planner.timeline(self.maps,records,{},clock=1000)
+        self.assertEqual(len(rows[0]['activity']),1)
+        self.assertEqual(rows[0]['activity'][0]['begin'],100)
+        self.assertEqual(rows[1]['activity'],[])
+        self.assertEqual(rows[2]['activity'][0]['complete'],0)
+        self.assertIsNone(rows[0]['lanes'][0]['last'])

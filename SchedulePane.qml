@@ -32,11 +32,41 @@ Column {
         Rectangle {
             id: card
             required property var modelData
-            width:root.width;height:112;radius:6
+            width:root.width;height:cardContent.implicitHeight+20;radius:6
             color:Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,modelData.room===null?0.09:0.035)
             Column {
-                anchors.fill:parent;anchors.margins:10;spacing:7
+                id:cardContent
+                anchors {left:parent.left;right:parent.right;top:parent.top;margins:10};spacing:7
                 Text {text:card.modelData.name+(card.modelData.room===null?"":"  ·  "+card.modelData.floorName);color:Color.foreground;font.family:Style.font.family;font.pixelSize:12;font.bold:card.modelData.room===null}
+                Column {
+                    width:parent.width
+                    visible:card.modelData.room===null
+                    spacing:6
+                    Text {width:parent.width;text:"RECORDED FLOOR ACTIVITY · "+(card.modelData.activity||[]).length+" runs · room coverage / mode unverified";color:Color.accent;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                    Rectangle {
+                        width:Math.max(120,root.width-365);height:23;x:52;radius:3;clip:true
+                        color:Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.06)
+                        Rectangle {x:parent.width/2;width:1;height:parent.height;color:Color.accent;opacity:0.6}
+                        Repeater {
+                            model:(card.modelData.activity||[]).filter(function(r){return r.begin>=Date.now()/1000-7*86400 && r.begin<=Date.now()/1000+7*86400})
+                            Rectangle {
+                                required property var modelData
+                                x:Math.max(0,Math.min(parent.width-5,parent.width/2+(modelData.begin-Date.now()/1000)/86400/14*parent.width))
+                                width:Math.max(5,Math.min(parent.width-x,(Math.max(0,(modelData.end||modelData.begin)-modelData.begin))/86400/14*parent.width));height:13;anchors.verticalCenter:parent.verticalCenter;radius:2
+                                color:modelData.complete===1?Color.accent:"#ed8796"
+                            }
+                        }
+                    }
+                    Repeater {
+                        model:card.modelData.activity||[]
+                        Text {
+                            required property var modelData
+                            width:parent.width
+                            text:new Date(modelData.begin*1000).toLocaleString(Qt.locale("en_GB"),"ddd d MMM HH:mm")+(modelData.end?"–"+new Date(modelData.end*1000).toLocaleTimeString(Qt.locale("en_GB"),"HH:mm"):"")+"  ·  "+(typeof modelData.duration==="number"?Math.round(modelData.duration/60)+" min":"duration unknown")+"  ·  "+(typeof modelData.area==="number"?(modelData.area/1000000).toFixed(1)+" m²":"area unknown")+"  ·  "+(modelData.complete===1?"Run complete":"Completion unconfirmed")
+                            color:Color.foreground;opacity:0.8;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap
+                        }
+                    }
+                }
                 Repeater {
                     model:card.modelData.lanes
                     Row {
