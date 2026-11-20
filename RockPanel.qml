@@ -71,25 +71,56 @@ Ui.Panel {
         stdout: StdioCollector { onStreamFinished: {try{var r=JSON.parse(text);root.actionMessage=r.error||r.status;if(!r.error)root.pending=null}catch(e){root.actionMessage="Command outcome unknown. Check the official app before retrying."}} }
         onExited: function(code) { if(code===0)root.refreshRequested() }
     }
-    Ui.KeyboardPanel {
-        id: popup
-        anchorItem: root.anchorItem
-        owner: root.hostWidget || root
-        bar: root.bar
-        open: root.opened
-        centerOnBar: true
-        focusTarget: catcher
-        contentWidth: fittedContentWidth(1120)
-        contentHeight: fittedContentHeight(760)
-        Ui.PanelKeyCatcher {
+    FloatingWindow {
+        id: appWindow
+        title: "OmaRock"
+        visible: root.opened
+        color: Color.background
+        implicitWidth: 1280
+        implicitHeight: 900
+        minimumSize: Qt.size(1000, 720)
+        onVisibleChanged: { if(!visible && root.opened)root.close() }
+        FocusScope {
             id: catcher
             anchors.fill: parent
-            onCloseRequested: {if(root.pending)root.pending=null;else root.close()}
-            onMoveRequested: function(dx,dy){if(dx)root.tab=(root.tab+dx+4)%4}
-            onTextKey: function(t){if(t==="r")root.refreshRequested();else if(t==="h")root.tab=1;else if(t==="m")root.tab=2;else if(t==="c")root.tab=3;else if(t==="o")root.tab=0}
+            focus: true
+            Keys.onPressed: function(event) {
+                if(event.key===Qt.Key_Escape) { if(root.pending)root.pending=null;else root.close();event.accepted=true }
+                else if(event.key===Qt.Key_Right) {root.tab=(root.tab+1)%4;event.accepted=true}
+                else if(event.key===Qt.Key_Left) {root.tab=(root.tab+3)%4;event.accepted=true}
+                else if(event.key===Qt.Key_R) {root.refreshRequested();event.accepted=true}
+                else if(event.key===Qt.Key_H) {root.tab=1;event.accepted=true}
+                else if(event.key===Qt.Key_M) {root.tab=2;event.accepted=true}
+                else if(event.key===Qt.Key_C) {root.tab=3;event.accepted=true}
+                else if(event.key===Qt.Key_O) {root.tab=0;event.accepted=true}
+            }
+            Rectangle {
+                id: sidebar
+                anchors {left:parent.left;top:parent.top;bottom:parent.bottom}
+                width:180
+                color: Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.025)
+                Rectangle {anchors.right:parent.right;width:1;height:parent.height;color:Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.12)}
+                Column {
+                    anchors {left:parent.left;right:parent.right;top:parent.top;margins:16;topMargin:30}
+                    spacing:12
+                    Text {text:"◎  OMAROCK";color:Color.accent;font.family:Style.font.family;font.pixelSize:16;font.bold:true}
+                    Text {text:"YOUR HOME, IN VIEW";color:root.muted;font.family:Style.font.family;font.pixelSize:9}
+                    Item {width:1;height:20}
+                    Repeater {
+                        model:["◈ Overview","◷ History","⌁ Maintenance","⚙ Connection"]
+                        RockButton {required property string modelData;required property int index;width:148;height:40;text:modelData;selected:root.tab===index;onClicked:{root.tab=index;catcher.forceActiveFocus()}}
+                    }
+                }
+                Column {
+                    anchors {left:parent.left;right:parent.right;bottom:parent.bottom;margins:18}
+                    spacing:5
+                    Text {text:"OMARCHY EDITION";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
+                    Text {text:"v0.1.0 · MIT";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
+                }
+            }
             Flickable {
                 id: scroller
-                anchors.fill: parent
+                anchors {left:sidebar.right;right:parent.right;top:parent.top;bottom:parent.bottom;margins:24}
                 contentWidth: width
                 contentHeight: body.implicitHeight
                 clip: true
@@ -104,7 +135,7 @@ Ui.Panel {
                             width: parent.width-115
                             spacing: 5
                             Text {text:"◎  OmaRock";font.family:Style.font.family;font.pixelSize:25;font.bold:true;color:Color.foreground}
-                            Text {text:(root.report.name||"Roborock companion")+"  ·  NATIVE OMARCHY PLUGIN";font.family:Style.font.family;font.pixelSize:10;color:root.muted}
+                            Text {text:(root.report.name||"Roborock companion")+"  ·  NATIVE DESKTOP APP";font.family:Style.font.family;font.pixelSize:10;color:root.muted}
                         }
                         RockButton {text:root.fetching?"Updating…":"Refresh ↻";available:!root.fetching;onClicked:root.refreshRequested()}
                     }
@@ -121,13 +152,6 @@ Ui.Panel {
                             color: Color.accent
                             font.family: Style.font.family
                             font.pixelSize: 11
-                        }
-                    }
-                    Row {
-                        spacing: 7
-                        Repeater {
-                            model:["Overview","History","Maintenance","Connection"]
-                            RockButton {required property string modelData;required property int index;text:modelData;selected:root.tab===index;onClicked:root.tab=index}
                         }
                     }
                     Column {
@@ -272,8 +296,8 @@ Ui.Panel {
                         width:parent.width
                         spacing:15
                         visible:root.tab===3
-                        Text {text:"Native. No browser required.";color:Color.foreground;font.family:Style.font.family;font.pixelSize:22}
-                        Text {width:parent.width;text:"This interface runs directly inside Omarchy’s Quickshell host. A private Python helper talks to Roborock. No HTTP server, browser dashboard or WebView.";color:Color.foreground;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
+                        Text {text:"Your Roborock, on your desktop.";color:Color.foreground;font.family:Style.font.family;font.pixelSize:22}
+                        Text {width:parent.width;text:"This is a separate native app window, opened from the application launcher or bar icon. Resize, tile or move it between workspaces like any other app. A private Python helper talks to Roborock. No browser, WebView or web server.";color:Color.foreground;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
                         Text {width:parent.width;text:"Sign in once on this machine using the library’s email-code login:\n\n~/.local/share/omarock/venv/bin/roborock login --email YOUR_EMAIL\n\nThen click Refresh. Credentials stay in ~/.roborock, outside the repository.";color:root.muted;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WrapAnywhere}
                         Text {width:parent.width;text:"Current limitations: only the current floor image is available; other floor maps must be selected in the official app after moving the robot. Room freshness is not inferred from incomplete history. Cleaning/mode/zone control awaits supervised Saros 20 testing.";color:root.muted;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
                     }
