@@ -31,6 +31,7 @@ Ui.Panel {
     readonly property bool hasRoomMask: !!floorMap.roomMaskPixels && floorMap.roomMaskPixels.coordinateFrame==="cropped-image-pixels"
     readonly property bool floorplanActive: floorplanView && hasRoomMask
     property bool showPath: true
+    property bool showPathAge: false
     property bool showObstacles: true
     property bool showRestrictions: true
     property var zones: []
@@ -292,6 +293,15 @@ Ui.Panel {
                                                 }
                                                 var layers=root.floorMap.layers||{}
                                                 function line(points,color,closed){if(!points.length)return;ctx.beginPath();ctx.moveTo(points[0][0]*sx,points[0][1]*sy);for(var i=1;i<points.length;i++)ctx.lineTo(points[i][0]*sx,points[i][1]*sy);if(closed)ctx.closePath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke()}
+                                                if(root.showPathAge){
+                                                    var observed=(root.report.pathHeatmaps||{})[String(root.floor)]||({cells:[]})
+                                                    for(var cell of observed.cells){
+                                                        if(!cell.points.length)continue
+                                                        ctx.beginPath();ctx.moveTo(cell.points[0][0]*sx,cell.points[0][1]*sy)
+                                                        for(var ci=1;ci<cell.points.length;ci++)ctx.lineTo(cell.points[ci][0]*sx,cell.points[ci][1]*sy)
+                                                        ctx.closePath();ctx.fillStyle=cell.color;ctx.globalAlpha=cell.kind==="mop_path"?0.85:0.55;ctx.fill();ctx.globalAlpha=1
+                                                    }
+                                                }
                                                 if(root.showPath)for(var path of (layers.path||[]))line(path.points,path.kind==="mop_path"?"#55ccee":"#f2d77a",false)
                                                 if(root.showRestrictions)for(var area of (layers.restrictions||[]))line(area.points,"#ff7676",area.points.length>2)
                                                 if(root.showObstacles)for(var obstacle of (layers.obstacles||[])){ctx.beginPath();ctx.arc(obstacle[0]*sx,obstacle[1]*sy,4,0,Math.PI*2);ctx.fillStyle="#ff9944";ctx.fill()}
@@ -354,6 +364,7 @@ Ui.Panel {
                                     RockButton {text:"Activity age · T";available:root.hasRoomMask;selected:root.showActivityAge;onClicked:{root.showActivityAge=!root.showActivityAge;mapCanvas.requestPaint()}}
                                     RockButton {text:"Floorplan · P";available:root.hasRoomMask;selected:root.floorplanActive;onClicked:{root.floorplanView=!root.floorplanView;mapCanvas.requestPaint()}}
                                     RockButton {text:"Room geometry · G";available:!!root.floorMap.roomMaskPixels;selected:root.showRoomGeometry;onClicked:{root.showRoomGeometry=!root.showRoomGeometry;mapCanvas.requestPaint()}}
+                                    RockButton {text:"Path age";available:!!((root.report.pathHeatmaps||{})[String(root.floor)]||{}).available;selected:root.showPathAge;onClicked:{root.showPathAge=!root.showPathAge;mapCanvas.requestPaint()}}
                                     RockButton {text:"Path";available:!!root.floorMap.layers && root.floorMap.layers.path.length>0;selected:root.showPath;onClicked:{root.showPath=!root.showPath;mapCanvas.requestPaint()}}
                                     RockButton {text:"Obstacles";available:!!root.floorMap.layers && root.floorMap.layers.obstacles.length>0;selected:root.showObstacles;onClicked:{root.showObstacles=!root.showObstacles;mapCanvas.requestPaint()}}
                                     RockButton {text:"Restrictions";available:!!root.floorMap.layers && root.floorMap.layers.restrictions.length>0;selected:root.showRestrictions;onClicked:{root.showRestrictions=!root.showRestrictions;mapCanvas.requestPaint()}}
@@ -364,7 +375,7 @@ Ui.Panel {
                                     text:evidence.captures===undefined ? "Recorded path evidence unavailable until snapshot refresh. Vacuum/mop coverage unverified." : "Recorded path evidence · this floor: "+(evidence.captures||0)+" captures; "+(evidence.pathCaptures||0)+" generic path; "+(evidence.mopPathCaptures||0)+" mop-path. Latest archived capture: "+(evidence.latest||"none")+". Vacuum coverage: unverified. Mop coverage: unverified. Generic paths do not establish vacuum mode; lines do not establish swept area."
                                     color:root.muted;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap
                                 }
-                                Text {width:parent.width;text:(root.floorplanActive ? "2D floorplan · captured room cells only; gaps are unknown, not walls. No height or metric scale. " : root.floorplanView ? "Floorplan unavailable for this floor/frame; showing vendor map. " : "")+"Activity age: grey unknown; green <2d; amber 2–6d; red ≥7d. Explicit completed room records only, NOT vacuum/mop coverage. Room geometry: exact captured cells, NOT cleaning coverage or metric area. Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence. Room age = explicit completed room record; unknown mode/coverage."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                                Text {width:parent.width;text:(root.floorplanActive ? "2D floorplan · captured room cells only; gaps are unknown, not walls. No height or metric scale. " : root.floorplanView ? "Floorplan unavailable for this floor/frame; showing vendor map. " : "")+"Path age: observed 5 cm centreline cells only, not swept/cleaned area or vacuum-mode proof. Green <2d; amber <7d; red older. Disabled until actual paths arrive. Activity age: grey unknown; green <2d; amber 2–6d; red ≥7d. Explicit completed room records only, NOT vacuum/mop coverage. Room geometry: exact captured cells, NOT cleaning coverage or metric area. Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence. Room age = explicit completed room record; unknown mode/coverage."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width
                                     spacing:6

@@ -163,6 +163,8 @@ class Robot:
         save(STATE/'path-captures.json',path_captures)
         result['pathCaptureCount']=sum(1 for row in path_captures if row.get('floor')==result['activeFloor'])
         result['pathEvidence']={str(m['id']):path_archive.summarize(path_captures,m['id']) for m in result.get('maps',[]) if type(m.get('id')) is int}
+        import path_heatmap
+        result['pathHeatmaps']={str(m['id']):path_heatmap.build(path_captures,m['id'],cached.get(str(m['id']),{}).get('calibration')) for m in result.get('maps',[]) if type(m.get('id')) is int}
         result['floorMaps']=cached
         result.update(cached.get(key,{}))
         import records,time,subprocess
