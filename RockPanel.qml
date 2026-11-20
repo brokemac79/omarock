@@ -68,6 +68,7 @@ Ui.Panel {
     }
     function submit() {
         if(!pending || !writable)return
+        if(pending.routine && pending.routine.reviewed!==true)return
         if(pending.action==="clean" && pending.plan){if(!confirmedFloor)return;pending.plan.confirmedFloor=floor}
         pending.confirmed=true
         action.command=[python,base+"/omarock.py","action","--request",JSON.stringify(pending)]
@@ -279,6 +280,16 @@ Ui.Panel {
                             }
                         }
                     }
+                    Column {
+                        width:parent.width;visible:root.tab===0;spacing:8
+                        Text {text:"Saved Roborock routines";color:Color.foreground;font.family:Style.font.family;font.pixelSize:18}
+                        Text {width:parent.width;text:root.report.routinesAvailable ? ((root.report.routines||[]).length ? "Review steps and physical floor in the official app before requesting a routine. Routine steps are not available here." : "No saved routines on this device.") : "Routines unavailable. Refresh to retry.";color:root.muted;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap}
+                        Flow {width:parent.width;spacing:6
+                            Repeater {model:root.report.routines||[]
+                                RockButton {required property var modelData;text:"Review: "+modelData.name;onClicked:{root.pending={action:"routine",routine:{id:modelData.id,reviewed:false},routineName:modelData.name};root.actionMessage=""}}
+                            }
+                        }
+                    }
                     RoomPreferences {
                         width:parent.width;visible:root.tab===0
                         python:root.python;base:root.base;floor:root.floor;rooms:root.current.rooms||[]
@@ -346,6 +357,7 @@ Ui.Panel {
                             Text {text:root.pending && root.pending.action==="clean"?"Review: "+root.current.name+" · "+["Rooms","Whole floor","Zone"][root.scope]+" · "+["Vacuum","Vacuum & mop","Mop"][root.mode]:"Confirm: "+(root.pending?root.pending.action+(root.pending.action==="reset-consumable"?" · "+root.pending.plan.consumable+" · I have replaced/cleaned this part":""):"");color:Color.foreground;font.family:Style.font.family;font.pixelSize:14}
                             RockButton {visible:!!root.pending && root.pending.action==="clean";text:(root.confirmedFloor?"✓ ":"□ ")+"Robot is physically on "+root.current.name;selected:root.confirmedFloor;onClicked:root.confirmedFloor=!root.confirmedFloor}
                             Text {text:root.pending && root.pending.action==="import-maps"?"While idle: briefly select each saved map, cache its image, then restore the original selection. No cleaning.":root.writable?"This will operate your robot. Supervise the first test.":"Safety lock or stale state: preview only. No device command can be sent.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11}
+                            RockButton {visible:!!root.pending && !!root.pending.routine;text:((root.pending && root.pending.routine && root.pending.routine.reviewed)?"✓ ":"□ ")+"I checked routine steps and physical floor in the official app";onClicked:{var p=root.pending;p.routine.reviewed=!p.routine.reviewed;root.pending=null;root.pending=p}}
                             Row {spacing:10;RockButton {text:"Cancel";onClicked:root.pending=null} RockButton {text:root.pending && root.pending.action==="import-maps"?"Import maps":action.running?"Sending…":"Send to robot";primary:true;available:root.pending && root.pending.action==="import-maps"?!root.fetching && !root.importing:root.writable && (!root.pending || root.pending.action!=="clean" || root.confirmedFloor);onClicked:{if(root.pending.action==="import-maps"){root.pending=null;root.actionMessage="Importing saved floors…";importer.running=true}else root.submit()}}}
                         }
                     }

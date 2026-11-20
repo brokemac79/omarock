@@ -123,6 +123,12 @@ class Robot:
                                     result['history'].append({k:rec.get(k) for k in ['begin','end','duration','area','complete','map_flag','area_ids','wash_count','clean_type']})
                         except Exception: errors.append('One history record unavailable')
             except Exception: errors.append(label+' unavailable')
+        try:
+            result['routines']=[{'id':r.id,'name':r.name} for r in await self.v.routines.get_routines()]
+            result['routinesAvailable']=True
+        except Exception:
+            result['routinesAvailable']=False
+            errors.append('Routines unavailable')
         cached=load(STATE/'floor-maps.json',{})
         key=str(result['activeFloor'])
         if include_map or key not in cached:
@@ -212,6 +218,15 @@ class Robot:
     async def execute(self, action, plan=None):
         if self.config.get('allow_control') is not True: raise ValueError('Control locked. Explicitly enable allow_control in your private config after supervised testing')
         await self.v.status.refresh()
+        if action=='routine':
+            import routines
+            identifier=routines.validate(plan,await self.v.routines.get_routines())
+            if self.v.status.in_cleaning or self.v.status.in_returning:
+                raise ValueError('Robot busy')
+            if (self.v.status.battery or 0)<20 or self.v.status.error_code or self.v.status.dock_error_status:
+                raise ValueError('Resolve battery or robot/dock warnings first')
+            await self.v.routines.execute_routine(identifier)
+            return 'Routine submitted; completion unverified'
         if action=='reset-consumable':
             import maintenance
             from roborock.devices.traits.v1.consumeable import ConsumableAttribute
@@ -416,7 +431,7 @@ def main():
         elif args.command=='action':
             request=json.loads(args.request)
             if request.get('confirmed') is not True: raise ValueError('Explicit confirmation required')
-            result={'status':'submitted; completion unverified', 'result':str(asyncio.run(perform(request.get('action'),plan=request.get('plan'))))[:200]}
+            result={'status':'submitted; completion unverified', 'result':str(asyncio.run(perform(request.get('action'),plan=request.get('routine') if request.get('action')=='routine' else request.get('plan'))))[:200]}
         else:
             result=load(STATE/'snapshot.json',{})
             if 'error' in result: result['robotError']=result.pop('error')
