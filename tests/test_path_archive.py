@@ -14,3 +14,13 @@ class Archive(unittest.TestCase):
   c=self.cap();c['layers']['path'][0]['points'][0][0]=float('nan');self.assertEqual(a.merge([],1,c),[])
  def test_bound(self):
   self.assertEqual(len(a.merge([{'digest':str(i)} for i in range(200)],1,self.cap())),120)
+ def test_summary_empty(self):
+  s=a.summarize([],1);self.assertEqual(s['captures'],0);self.assertIsNone(s['latest']);self.assertEqual(s['vacuumCoverage'],'unverified')
+ def test_summary_floor_and_modes(self):
+  r=a.merge([],1,self.cap())
+  c=self.cap();c['layers']['path'][0]['kind']='mop_path'
+  r=a.merge(r,2,c)
+  self.assertEqual(a.summarize(r,1)['pathCaptures'],1)
+  self.assertEqual(a.summarize(r,1)['mopPathCaptures'],0)
+  self.assertEqual(a.summarize(r,2)['mopPathCaptures'],1)
+  self.assertEqual(a.summarize(r,2)['mopCoverage'],'unverified')

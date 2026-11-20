@@ -351,6 +351,12 @@ Ui.Panel {
                                     RockButton {text:"Obstacles";available:!!root.floorMap.layers && root.floorMap.layers.obstacles.length>0;selected:root.showObstacles;onClicked:{root.showObstacles=!root.showObstacles;mapCanvas.requestPaint()}}
                                     RockButton {text:"Restrictions";available:!!root.floorMap.layers && root.floorMap.layers.restrictions.length>0;selected:root.showRestrictions;onClicked:{root.showRestrictions=!root.showRestrictions;mapCanvas.requestPaint()}}
                                 }
+                                Text {
+                                    width:parent.width
+                                    readonly property var evidence:(root.report.pathEvidence||{})[String(root.floor)]||({})
+                                    text:"Recorded path evidence · this floor: "+(evidence.captures||0)+" captures; "+(evidence.pathCaptures||0)+" generic path; "+(evidence.mopPathCaptures||0)+" mop-path. Latest archived capture: "+(evidence.latest||"none")+". Vacuum coverage: unverified. Mop coverage: unverified. Generic paths do not establish vacuum mode; lines do not establish swept area."
+                                    color:root.muted;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap
+                                }
                                 Text {width:parent.width;text:(root.floorplanActive ? "2D floorplan · captured room cells only; gaps are unknown, not walls. No height or metric scale. " : root.floorplanView ? "Floorplan unavailable for this floor/frame; showing vendor map. " : "")+"Activity age: grey unknown; green <2d; amber 2–6d; red ≥7d. Explicit completed room records only, NOT vacuum/mop coverage. Room geometry: exact captured cells, NOT cleaning coverage or metric area. Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence. Room age = explicit completed room record; unknown mode/coverage."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width

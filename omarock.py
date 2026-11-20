@@ -162,6 +162,7 @@ class Robot:
         path_captures=path_archive.merge(load(STATE/'path-captures.json',[]),result['activeFloor'],cached.get(key,{}))
         save(STATE/'path-captures.json',path_captures)
         result['pathCaptureCount']=sum(1 for row in path_captures if row.get('floor')==result['activeFloor'])
+        result['pathEvidence']={str(m['id']):path_archive.summarize(path_captures,m['id']) for m in result.get('maps',[]) if type(m.get('id')) is int}
         result['floorMaps']=cached
         result.update(cached.get(key,{}))
         import records,time,subprocess
