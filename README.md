@@ -1,10 +1,10 @@
 # OmaRock
 
-**A native Roborock plugin for Omarchy.** The bar widget opens a theme-aware QML map-and-control panel directly inside Omarchy’s Quickshell process. **No browser, WebView or web server.** Independent community project, not affiliated with Roborock. MIT licensed; private early-alpha development.
+**A native Roborock plugin for Omarchy.** The bar widget and application launcher open a separate, resizable, theme-aware native QML app window hosted by Omarchy’s Quickshell process. **No browser, WebView or web server.** Independent community project, not affiliated with Roborock. MIT licensed; private early-alpha development.
 
 ## Features
 
-- Native bar status and a keyboard-accessible QML panel with Overview / History / Maintenance / Connection.
+- Native bar status and a keyboard-accessible native app with Overview / History / Maintenance / Connection.
 - Three-floor browsing, named room selection, current floor map and robot-reported cleaning route.
 - Rooms / whole-floor / rectangular-zone cleaning plans; vacuum, mop or both; repeat passes for rooms/zones.
 - Battery, washing/drying flags, clean/dirty tank flags (not fill levels), consumable hours and recent runs.
@@ -24,7 +24,7 @@ omarchy plugin enable io.github.brokemac79.omarock
 cp ~/.config/omarchy/plugins/io.github.brokemac79.omarock/omarock.desktop ~/.local/share/applications/
 ```
 
-Private repo access needs GitHub authentication. Click the robot bar icon to open the native panel. Middle-click or press R in the panel to refresh; Escape closes the review or panel. The Python environment MUST live outside the plugin tree (Omarchy disallows internal symlinks). No auto-start daemon or listening port is installed.
+Private repo access needs GitHub authentication. Click the robot bar icon or launch **OmaRock** from the application launcher to open the app window. Middle-click or press R in the panel to refresh; Escape closes the review or app window. The Python environment MUST live outside the plugin tree (Omarchy disallows internal symlinks). No auto-start daemon or listening port is installed.
 
 ## Account and private data
 
@@ -40,7 +40,7 @@ A request is **submitted**, never assumed complete. Mode setting and starting ar
 
 ## Honest limitations
 
-Only the active floor’s image is available; other saved floor names/rooms can be browsed without pretending their image is current. History may omit room IDs. No fabricated last-cleaned room dates or freshness layer. Maps use real robot-rendered data, not the illustrative furniture from the design concept. The app launcher and bar open the same native Omarchy panel, not an independent browser or WebView. A separate resizable native window can be added later.
+Only the active floor’s image is available; other saved floor names/rooms can be browsed without pretending their image is current. History may omit room IDs. No fabricated last-cleaned room dates or freshness layer. Maps use real robot-rendered data, not the illustrative furniture from the design concept. The app launcher and bar open/focus the same independent native window. It remains open when it loses focus and can be tiled or moved to another workspace. Narrow compositor-forced tiles scroll horizontally instead of overlapping controls. No browser or WebView.
 
 ## Development
 

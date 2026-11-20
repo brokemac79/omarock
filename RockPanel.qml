@@ -71,6 +71,9 @@ Ui.Panel {
         stdout: StdioCollector { onStreamFinished: {try{var r=JSON.parse(text);root.actionMessage=r.error||r.status;if(!r.error)root.pending=null}catch(e){root.actionMessage="Command outcome unknown. Check the official app before retrying."}} }
         onExited: function(code) { if(code===0)root.refreshRequested() }
     }
+    function open() { controller.show(); focusTimer.restart() }
+    Timer { id: focusTimer; interval: 150; onTriggered: {catcher.forceActiveFocus(); if(!focusApp.running)focusApp.running=true} }
+    Process { id: focusApp; command: ["hyprctl","dispatch",'hl.dsp.focus({ window = "title:^OmaRock$" })'] }
     FloatingWindow {
         id: appWindow
         title: "OmaRock"
@@ -78,7 +81,7 @@ Ui.Panel {
         color: Color.background
         implicitWidth: 1280
         implicitHeight: 900
-        minimumSize: Qt.size(1000, 720)
+        minimumSize: Qt.size(860, 600)
         onVisibleChanged: { if(!visible && root.opened)root.close() }
         FocusScope {
             id: catcher
@@ -121,13 +124,13 @@ Ui.Panel {
             Flickable {
                 id: scroller
                 anchors {left:sidebar.right;right:parent.right;top:parent.top;bottom:parent.bottom;margins:24}
-                contentWidth: width
+                contentWidth: Math.max(width,800)
                 contentHeight: body.implicitHeight
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 Column {
                     id: body
-                    width: parent.width
+                    width: scroller.contentWidth
                     spacing: 16
                     Row {
                         width: parent.width

@@ -38,8 +38,8 @@ Ui.BarWidget {
         anchors.fill: parent
         bar: root.bar
         text: "󰤄 "+(root.stale ? "—" : root.report.battery+"%")
-        tooltipText: "OmaRock · "+(root.stale ? "Cached / stale" : root.report.state)+" · click to open native panel"
-        onPressed: function(b) { if(b===Qt.MiddleButton)root.refresh();else root.toggle() }
+        tooltipText: "OmaRock · "+(root.stale ? "Cached / stale" : root.report.state)+" · click to open OmaRock app"
+        onPressed: function(b) { if(b===Qt.MiddleButton)root.refresh();else root.open() }
     }
     RockPanel {
         id: panel
