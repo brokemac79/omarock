@@ -24,6 +24,7 @@ Ui.Panel {
     property int mode: 0
     property int passes: 1
     property var selected: []
+    property bool showRoomGeometry: false
     property bool showPath: true
     property bool showObstacles: true
     property bool showRestrictions: true
@@ -42,6 +43,7 @@ Ui.Panel {
     signal mapsImported(var value)
     readonly property bool importing: importer.running
     readonly property var floorMap: (report.floorMaps || {})[String(floor)] || (activeFloor ? report : ({}))
+    onFloorMapChanged: Qt.callLater(function(){mapCanvas.requestPaint()})
     readonly property bool authActive: loginForm.authActive
     onOpenedChanged: {if(!opened && loginForm.authActive)loginForm.cancel()}
     onPendingChanged: { if(pending)Qt.callLater(function(){scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)}) }
@@ -112,6 +114,7 @@ Ui.Panel {
                 if(event.key===Qt.Key_Escape) { if(root.pending)root.pending=null;else root.close();event.accepted=true }
                 else if(root.tab===0 && (event.key===Qt.Key_Plus || event.key===Qt.Key_Equal)) {mapViewport.zoom=Math.min(5,mapViewport.zoom*1.25);event.accepted=true}
                 else if(root.tab===0 && event.key===Qt.Key_Minus) {mapViewport.zoom=Math.max(1,mapViewport.zoom/1.25);event.accepted=true}
+                else if(root.tab===0 && event.key===Qt.Key_G) {root.showRoomGeometry=!root.showRoomGeometry;mapCanvas.requestPaint();event.accepted=true}
                 else if(root.tab===0 && event.key===Qt.Key_F) {mapViewport.fit();event.accepted=true}
                 else if(root.tab===0 && event.key===Qt.Key_B) {mapViewport.centreRobot();event.accepted=true}
                 else if(root.tab===0 && event.modifiers & Qt.ControlModifier && [Qt.Key_Left,Qt.Key_Right,Qt.Key_Up,Qt.Key_Down].indexOf(event.key)>=0) {mapViewport.panX+=event.key===Qt.Key_Left?-30:event.key===Qt.Key_Right?30:0;mapViewport.panY+=event.key===Qt.Key_Up?-30:event.key===Qt.Key_Down?30:0;event.accepted=true}
@@ -268,6 +271,16 @@ Ui.Panel {
                                                 var ctx=getContext("2d");ctx.clearRect(0,0,width,height)
                                                 if(!mapImage.sourceSize.width || !mapImage.sourceSize.height)return
                                                 var sx=width/mapImage.sourceSize.width,sy=height/mapImage.sourceSize.height
+                                                var mask=root.floorMap.roomMaskPixels
+                                                if(root.showRoomGeometry && mask && mask.coordinateFrame==="cropped-image-pixels"){
+                                                    var palette=["#55ccee","#efbb66","#aa88dd","#77cc99"]
+                                                    ctx.save();ctx.globalAlpha=0.32
+                                                    for(var ri=0;ri<mask.rooms.length;ri++){
+                                                        ctx.fillStyle=palette[ri%palette.length]
+                                                        for(var rect of mask.rooms[ri].rects)ctx.fillRect(rect[0]*sx,rect[1]*sy,rect[2]*sx,rect[3]*sy)
+                                                    }
+                                                    ctx.restore()
+                                                }
                                                 var layers=root.floorMap.layers||{}
                                                 function line(points,color,closed){if(!points.length)return;ctx.beginPath();ctx.moveTo(points[0][0]*sx,points[0][1]*sy);for(var i=1;i<points.length;i++)ctx.lineTo(points[i][0]*sx,points[i][1]*sy);if(closed)ctx.closePath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke()}
                                                 if(root.showPath)for(var path of (layers.path||[]))line(path.points,path.kind==="mop_path"?"#55ccee":"#f2d77a",false)
@@ -323,11 +336,12 @@ Ui.Panel {
                                 Text {width:parent.width;text:"+/− or wheel/pinch: zoom · F: fit · B: robot · Ctrl+arrows/right-drag: pan · tap labels to select";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width;spacing:6
+                                    RockButton {text:"Room geometry · G";available:!!root.floorMap.roomMaskPixels;selected:root.showRoomGeometry;onClicked:{root.showRoomGeometry=!root.showRoomGeometry;mapCanvas.requestPaint()}}
                                     RockButton {text:"Path";available:!!root.floorMap.layers && root.floorMap.layers.path.length>0;selected:root.showPath;onClicked:{root.showPath=!root.showPath;mapCanvas.requestPaint()}}
                                     RockButton {text:"Obstacles";available:!!root.floorMap.layers && root.floorMap.layers.obstacles.length>0;selected:root.showObstacles;onClicked:{root.showObstacles=!root.showObstacles;mapCanvas.requestPaint()}}
                                     RockButton {text:"Restrictions";available:!!root.floorMap.layers && root.floorMap.layers.restrictions.length>0;selected:root.showRestrictions;onClicked:{root.showRestrictions=!root.showRestrictions;mapCanvas.requestPaint()}}
                                 }
-                                Text {width:parent.width;text:"Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence. Room age = explicit completed room record; unknown mode/coverage."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                                Text {width:parent.width;text:"Room geometry: exact captured cells, NOT cleaning coverage or metric area. Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence. Room age = explicit completed room record; unknown mode/coverage."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width
                                     spacing:6
