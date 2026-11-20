@@ -326,7 +326,7 @@ async def auth_stdio():
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('command',choices=['snapshot','cached','bar','action','auth','import-maps'])
+    parser.add_argument('command',choices=['snapshot','cached','bar','action','auth','import-maps','planner','save-plan'])
     parser.add_argument('--request',default='{}')
     args=parser.parse_args()
     private_dir(STATE);private_dir(CONFIG)
@@ -346,6 +346,16 @@ def main():
         elif args.command=='snapshot':
             result=asyncio.run(perform('snapshot',include_map=True))
             save(STATE/'snapshot.json',result)
+        elif args.command in ('planner','save-plan'):
+            import planner
+            snapshot=load(STATE/'snapshot.json',{})
+            plans=load(STATE/'plans.json',{})
+            if args.command=='save-plan':
+                plan=planner.validate(json.loads(args.request),snapshot.get('maps',[]))
+                plan['anchor']=dt.datetime.now(dt.timezone.utc).timestamp()
+                plans[planner.key(plan['floor'],plan['room'],plan['mode'])]=plan
+                save(STATE/'plans.json',plans)
+            result={'rows':planner.timeline(snapshot.get('maps',[]),snapshot.get('history',[]),plans)}
         elif args.command=='action':
             request=json.loads(args.request)
             if request.get('confirmed') is not True: raise ValueError('Explicit confirmation required')

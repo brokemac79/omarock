@@ -18,6 +18,7 @@ Ui.Panel {
     property string python: ""
     property string base: ""
     property int tab: 0
+    onTabChanged: {if(tab===4 && !planReader.running)planReader.running=true}
     property int floor: -1
     property int scope: 0
     property int mode: 0
@@ -82,6 +83,11 @@ Ui.Panel {
         command: [root.python,root.base+"/omarock.py","import-maps","--request",'{"confirmed":true}']
         stdout: StdioCollector { onStreamFinished: {try {var value=JSON.parse(text);root.actionMessage=value.error || value.importMessage;if(!value.error)root.mapsImported(value)} catch(e) {root.actionMessage="Map import outcome unknown. Check the selected floor in the official app."}} }
     }
+    Process {
+        id: planReader
+        command: [root.python,root.base+"/omarock.py","planner"]
+        stdout: StdioCollector {onStreamFinished:{try{schedule.rows=JSON.parse(text).rows||[]}catch(e){root.actionMessage="Cannot read cleaning plans"}}}
+    }
     function open() { if(!report.authPresent)tab=3;controller.show(); focusTimer.restart() }
     Timer { id: focusTimer; interval: 150; onTriggered: {catcher.forceActiveFocus(); if(!focusApp.running)focusApp.running=true} }
     Process { id: focusApp; command: ["hyprctl","dispatch",'hl.dsp.focus({ window = "title:^OmaRock$" })'] }
@@ -100,8 +106,8 @@ Ui.Panel {
             focus: true
             Keys.onPressed: function(event) {
                 if(event.key===Qt.Key_Escape) { if(root.pending)root.pending=null;else root.close();event.accepted=true }
-                else if(event.key===Qt.Key_Right) {root.tab=(root.tab+1)%4;event.accepted=true}
-                else if(event.key===Qt.Key_Left) {root.tab=(root.tab+3)%4;event.accepted=true}
+                else if(event.key===Qt.Key_Right) {root.tab=(root.tab+1)%5;event.accepted=true}
+                else if(event.key===Qt.Key_Left) {root.tab=(root.tab+4)%5;event.accepted=true}
                 else if(event.key===Qt.Key_R) {root.refreshRequested();event.accepted=true}
                 else if(event.key===Qt.Key_H) {root.tab=1;event.accepted=true}
                 else if(event.key===Qt.Key_M) {root.tab=2;event.accepted=true}
@@ -121,7 +127,7 @@ Ui.Panel {
                     Text {text:"YOUR HOME, IN VIEW";color:root.muted;font.family:Style.font.family;font.pixelSize:9}
                     Item {width:1;height:20}
                     Repeater {
-                        model:["◈ Overview","◷ History","⌁ Maintenance","⚙ Connection"]
+                        model:["◈ Overview","◷ History","⌁ Maintenance","⚙ Connection","▤ Timeline"]
                         RockButton {required property string modelData;required property int index;width:148;height:40;text:modelData;selected:root.tab===index;onClicked:{root.tab=index;catcher.forceActiveFocus()}}
                     }
                 }
@@ -323,6 +329,15 @@ Ui.Panel {
                             onSignedIn:{root.signedIn();root.tab=0}
                         }
                         Text {width:parent.width;text:"Import all floors caches saved map images while idle and restores the original map selection. Browsing cached floors never switches the robot. Cleaning still requires the robot’s active map and physical-floor confirmation. Room freshness is not inferred from incomplete history. Cleaning/mode/zone control awaits supervised Saros 20 testing.";color:root.muted;font.family:Style.font.family;font.pixelSize:12;wrapMode:Text.WordWrap}
+                    }
+                    SchedulePane {
+                        id: schedule
+                        width:parent.width
+                        visible:root.tab===4
+                        python:root.python
+                        base:root.base
+                        onEditingChanged:{if(editing)Qt.callLater(function(){scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)})}
+                        onCleanRequested:function(floorId,roomId,cleanMode){root.chooseFloor(floorId);root.scope=roomId===null?1:0;root.selected=roomId===null?[]:[roomId];root.mode=cleanMode==="mop"?2:0;root.tab=0;root.actionMessage="Review the active map and physical floor before cleaning."}
                     }
                     Rectangle {
                         width:parent.width
