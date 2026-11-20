@@ -36,7 +36,8 @@ Column {
             color:Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,modelData.room===null?0.09:0.035)
             Column {
                 id:cardContent
-                anchors {left:parent.left;right:parent.right;top:parent.top;margins:10};spacing:7
+                anchors {left:parent.left;right:parent.right;top:parent.top;margins:10}
+                spacing:7
                 Text {text:card.modelData.name+(card.modelData.room===null?"":"  ·  "+card.modelData.floorName);color:Color.foreground;font.family:Style.font.family;font.pixelSize:12;font.bold:card.modelData.room===null}
                 Column {
                     width:parent.width
