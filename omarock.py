@@ -208,6 +208,9 @@ class Robot:
             result['calibration']=calibration
             import map_layers
             result['layers']=map_layers.serialize(content.map_data,left,top)
+            import mask_projection
+            image_config=getattr(getattr(grid_tap,'delegate',None),'_image_config',None)
+            result['roomMaskPixels']=mask_projection.project(grid_tap.mask,image_config,left,top) if grid_tap and image_config else None
         if not result.get('mapImage'): raise ValueError('Map image unavailable')
         # Uncalibrated masks stay in private per-floor capture state, not a UI overlay.
         result['roomGrid']=grid_tap.mask if grid_tap else None
