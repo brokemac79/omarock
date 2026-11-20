@@ -158,6 +158,10 @@ class Robot:
                 cached[key]=await self.capture_map()
                 save(STATE/'floor-maps.json',cached)
             except Exception: errors.append('Map unavailable')
+        import path_archive
+        path_captures=path_archive.merge(load(STATE/'path-captures.json',[]),result['activeFloor'],cached.get(key,{}))
+        save(STATE/'path-captures.json',path_captures)
+        result['pathCaptureCount']=sum(1 for row in path_captures if row.get('floor')==result['activeFloor'])
         result['floorMaps']=cached
         result.update(cached.get(key,{}))
         import records,time,subprocess

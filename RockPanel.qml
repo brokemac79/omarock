@@ -321,7 +321,7 @@ Ui.Panel {
                                     RockButton {text:"Obstacles";available:!!root.floorMap.layers && root.floorMap.layers.obstacles.length>0;selected:root.showObstacles;onClicked:{root.showObstacles=!root.showObstacles;mapCanvas.requestPaint()}}
                                     RockButton {text:"Restrictions";available:!!root.floorMap.layers && root.floorMap.layers.restrictions.length>0;selected:root.showRestrictions;onClicked:{root.showRestrictions=!root.showRestrictions;mapCanvas.requestPaint()}}
                                 }
-                                Text {width:parent.width;text:"Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence.";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                                Text {width:parent.width;text:"Layers: captured vendor geometry only; disabled = no data. Carpet raster unavailable. Colours are not coverage evidence."+(root.activeFloor ? " Archived path captures: "+(root.report.pathCaptureCount||0)+" (not room/mode coverage)." : "");color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width
                                     spacing:6
