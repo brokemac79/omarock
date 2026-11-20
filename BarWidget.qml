@@ -10,7 +10,7 @@ Ui.BarWidget {
     property var report: ({})
     property double clock: Date.now()
     property string lastError: ""
-    readonly property string base: decodeURIComponent(Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")).replace(/\/$/, "")
+    readonly property string base: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME")+"/.config")+"/omarchy/plugins/io.github.brokemac79.omarock"
     readonly property string python: (Quickshell.env("XDG_DATA_HOME") || Quickshell.env("HOME")+"/.local/share")+"/omarock/venv/bin/python"
     readonly property bool stale: !report.at || clock-Date.parse(report.at)>180000
     readonly property bool opened: panel.opened
