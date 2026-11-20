@@ -201,8 +201,26 @@ Ui.Panel {
                                     radius: 7
                                     color: Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.045)
                                     border.color: Qt.rgba(Color.foreground.r,Color.foreground.g,Color.foreground.b,0.12)
+                                    id: mapViewport
+                                    clip: true
+                                    property real zoom: 1
+                                    property real panX: 0
+                                    property real panY: 0
+                                    function fit() {zoom=1;panX=0;panY=0}
+                                    onWidthChanged:fit()
+                                    Connections {target:root;function onFloorChanged(){mapViewport.fit()}}
+                                    PinchHandler {
+                                        target:null
+                                        property real initialZoom:1
+                                        onActiveChanged: {if(active)initialZoom=mapViewport.zoom}
+                                        onActiveScaleChanged: {if(active)mapViewport.zoom=Math.max(1,Math.min(5,initialZoom*activeScale))}
+                                    }
                                     Image {
                                         id: mapImage
+                                        transform: [
+                                            Scale {origin.x:mapImage.width/2;origin.y:mapImage.height/2;xScale:mapViewport.zoom;yScale:mapViewport.zoom},
+                                            Translate {x:mapViewport.panX;y:mapViewport.panY}
+                                        ]
                                         anchors.fill: parent
                                         anchors.margins: 8
                                         source: root.floorMap.mapImage || ""
@@ -223,6 +241,10 @@ Ui.Panel {
                                     }
                                     Item {
                                         id: imagePlane
+                                        transform: [
+                                            Scale {origin.x:imagePlane.width/2;origin.y:imagePlane.height/2;xScale:mapViewport.zoom;yScale:mapViewport.zoom},
+                                            Translate {x:mapViewport.panX;y:mapViewport.panY}
+                                        ]
                                         width: mapImage.paintedWidth
                                         height: mapImage.paintedHeight
                                         anchors.centerIn: parent
@@ -247,13 +269,16 @@ Ui.Panel {
                                         }
                                         MouseArea {
                                             anchors.fill:parent
-                                            enabled:root.scope===2 && root.activeFloor && mapImage.status===Image.Ready
+                                            enabled:mapImage.status===Image.Ready
+                                            acceptedButtons:Qt.LeftButton | Qt.RightButton
+                                            property var panStart:null
+                                            onWheel:function(wheel){mapViewport.zoom=Math.max(1,Math.min(5,mapViewport.zoom*(wheel.angleDelta.y>0?1.2:1/1.2)));wheel.accepted=true}
                                             cursorShape:Qt.CrossCursor
                                             function p(mouse){return [Math.max(0,Math.min(mapImage.sourceSize.width,mouse.x/width*mapImage.sourceSize.width)),Math.max(0,Math.min(mapImage.sourceSize.height,mouse.y/height*mapImage.sourceSize.height))]}
-                                            onPressed:function(mouse){if(root.zones.length>=5){root.actionMessage="Maximum five zones";return};var a=p(mouse);root.draft=[a[0],a[1],a[0],a[1]];mapCanvas.requestPaint()}
-                                            onPositionChanged:function(mouse){if(root.draft){var a=p(mouse);root.draft=[root.draft[0],root.draft[1],a[0],a[1]];mapCanvas.requestPaint()}}
-                                            onReleased:{if(root.draft && Math.abs(root.draft[2]-root.draft[0])>5 && Math.abs(root.draft[3]-root.draft[1])>5)root.zones=root.zones.concat([root.draft]);root.draft=null;mapCanvas.requestPaint()}
-                                            onCanceled:{root.draft=null;mapCanvas.requestPaint()}
+                                            onPressed:function(mouse){if(mouse.button===Qt.RightButton){var v=mapToItem(mapViewport,mouse.x,mouse.y);panStart=[v.x,v.y,mapViewport.panX,mapViewport.panY];return};if(root.scope!==2 || !root.activeFloor)return;if(root.zones.length>=5){root.actionMessage="Maximum five zones";return};var a=p(mouse);root.draft=[a[0],a[1],a[0],a[1]];mapCanvas.requestPaint()}
+                                            onPositionChanged:function(mouse){if(panStart){var v=mapToItem(mapViewport,mouse.x,mouse.y);mapViewport.panX=panStart[2]+v.x-panStart[0];mapViewport.panY=panStart[3]+v.y-panStart[1];return};if(root.draft){var a=p(mouse);root.draft=[root.draft[0],root.draft[1],a[0],a[1]];mapCanvas.requestPaint()}}
+                                            onReleased:{panStart=null;if(root.draft && Math.abs(root.draft[2]-root.draft[0])>5 && Math.abs(root.draft[3]-root.draft[1])>5)root.zones=root.zones.concat([root.draft]);root.draft=null;mapCanvas.requestPaint()}
+                                            onCanceled:{panStart=null;root.draft=null;mapCanvas.requestPaint()}
                                         }
                                     }
                                 }
@@ -262,6 +287,13 @@ Ui.Panel {
                                     Text {width:parent.width-110;text:root.floorMap.mapAt?"Map captured "+new Date(root.floorMap.mapAt).toLocaleTimeString(Qt.locale("en_GB"),"HH:mm"):"Robot-reported map";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
                                     RockButton {text:"Clear zones";onClicked:{root.zones=[];mapCanvas.requestPaint()}}
                                 }
+                                Flow {
+                                    width:parent.width;spacing:6
+                                    RockButton {text:"−";onClicked:mapViewport.zoom=Math.max(1,mapViewport.zoom/1.25)}
+                                    RockButton {text:"+";onClicked:mapViewport.zoom=Math.min(5,mapViewport.zoom*1.25)}
+                                    RockButton {text:"Fit";onClicked:mapViewport.fit()}
+                                }
+                                Text {width:parent.width;text:"Wheel / pinch to zoom · right-drag to pan · left-drag draws zones in Zone mode";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width;spacing:6
                                     RockButton {text:"Path";available:!!root.floorMap.layers && root.floorMap.layers.path.length>0;selected:root.showPath;onClicked:{root.showPath=!root.showPath;mapCanvas.requestPaint()}}
