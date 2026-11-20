@@ -107,6 +107,8 @@ Ui.Panel {
             focus: true
             Keys.onPressed: function(event) {
                 if(event.key===Qt.Key_Escape) { if(root.pending)root.pending=null;else root.close();event.accepted=true }
+                else if(event.key===Qt.Key_End) {scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height);event.accepted=true}
+                else if(event.key===Qt.Key_Home) {scroller.contentY=0;event.accepted=true}
                 else if(event.key===Qt.Key_Right) {root.tab=(root.tab+1)%6;event.accepted=true}
                 else if(event.key===Qt.Key_Left) {root.tab=(root.tab+5)%6;event.accepted=true}
                 else if(event.key===Qt.Key_R) {root.refreshRequested();event.accepted=true}
