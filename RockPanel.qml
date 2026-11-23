@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as Controls
 import "RoomGeometry.js" as RoomGeometry
 import Quickshell
 import Quickshell.Io
@@ -52,7 +53,9 @@ Ui.Panel {
     onFloorMapChanged: Qt.callLater(function(){mapCanvas.requestPaint()})
     readonly property bool authActive: loginForm.authActive
     onOpenedChanged: {if(!opened && loginForm.authActive)loginForm.cancel()}
-    onPendingChanged: { if(pending)Qt.callLater(function(){scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)}) }
+    property int selectedZone: -1
+    property bool panMode: false
+    onZonesChanged: { if(selectedZone>=zones.length)selectedZone=-1; if(pending && pending.action==="clean")pending=null }
     onReportChanged: { Qt.callLater(function(){mapCanvas.requestPaint()}); if(floor===-1 && report.activeFloor!==undefined)floor=report.activeFloor; if(tab===4 && !planReader.running)planReader.running=true }
     function label(s) { return String(s===undefined || s===null ? "unknown" : s).replace(/_/g," ") }
     function chooseFloor(id) {floor=id;selected=[];zones=[];draft=null;mapCanvas.requestPaint()}
@@ -126,6 +129,7 @@ Ui.Panel {
                 else if(root.tab===0 && event.key===Qt.Key_F) {mapViewport.fit();event.accepted=true}
                 else if(root.tab===0 && event.key===Qt.Key_B) {mapViewport.centreRobot();event.accepted=true}
                 else if(root.tab===0 && event.modifiers & Qt.ControlModifier && [Qt.Key_Left,Qt.Key_Right,Qt.Key_Up,Qt.Key_Down].indexOf(event.key)>=0) {mapViewport.panX+=event.key===Qt.Key_Left?-30:event.key===Qt.Key_Right?30:0;mapViewport.panY+=event.key===Qt.Key_Up?-30:event.key===Qt.Key_Down?30:0;event.accepted=true}
+                else if(event.key===Qt.Key_PageUp || event.key===Qt.Key_PageDown) {scroller.contentY=Math.max(0,Math.min(scroller.contentHeight-scroller.height,scroller.contentY+(event.key===Qt.Key_PageUp?-1:1)*scroller.height*0.85));event.accepted=true}
                 else if(event.key===Qt.Key_End) {scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height);event.accepted=true}
                 else if(event.key===Qt.Key_Home) {scroller.contentY=0;event.accepted=true}
                 else if(event.key===Qt.Key_Right) {root.tab=(root.tab+1)%6;event.accepted=true}
@@ -152,6 +156,7 @@ Ui.Panel {
                         model:["◈ Overview","◷ History","⌁ Maintenance","⚙ Connection","▤ Timeline","◷ Schedules"]
                         RockButton {required property string modelData;required property int index;width:148;height:40;text:modelData;selected:root.tab===index;onClicked:{root.tab=index;catcher.forceActiveFocus()}}
                     }
+                    RockButton {text:"Open pending review ↓";width:148;visible:!!root.pending;onClicked:scroller.contentY=Math.max(0,scroller.contentHeight-scroller.height)}
                 }
                 Column {
                     anchors {left:parent.left;right:parent.right;bottom:parent.bottom;margins:18}
@@ -162,11 +167,17 @@ Ui.Panel {
             }
             Flickable {
                 id: scroller
-                anchors {left:sidebar.right;right:parent.right;top:parent.top;bottom:parent.bottom;margins:16}
+                anchors {left:sidebar.right;right:parent.right;top:parent.top;bottom:parent.bottom;margins:16;rightMargin:30}
                 contentWidth: Math.max(width,800)
                 contentHeight: body.implicitHeight+24
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
+                Controls.ScrollBar.vertical: Controls.ScrollBar {
+                    policy: Controls.ScrollBar.AlwaysOn
+                    parent: scroller.parent
+                    anchors {left:scroller.right;top:scroller.top;bottom:scroller.bottom}
+                    width: 14
+                }
                 Column {
                     id: body
                     width: scroller.contentWidth
@@ -211,6 +222,11 @@ Ui.Panel {
                             Column {
                                 width: parent.width-285
                                 spacing: 10
+                                Flow {
+                                    width:parent.width;spacing:6
+                                    RockButton {text:"Path age";available:!!((root.report.pathHeatmaps||{})[String(root.floor)]||{}).available;selected:root.showPathAge;onClicked:{root.showPathAge=!root.showPathAge;mapCanvas.requestPaint()}}
+                                    RockButton {text:"Pan map";selected:root.panMode;onClicked:root.panMode=!root.panMode}
+                                }
                                 Rectangle {
                                     width: parent.width
                                     height: Math.min(360,width*0.65,Math.max(210,scroller.height-245))
@@ -302,12 +318,14 @@ Ui.Panel {
                                                         ctx.closePath();ctx.fillStyle=cell.color;ctx.globalAlpha=cell.kind==="mop_path"?0.85:0.55;ctx.fill();ctx.globalAlpha=1
                                                     }
                                                 }
-                                                if(root.showPath)for(var path of (layers.path||[]))line(path.points,path.kind==="mop_path"?"#55ccee":"#f2d77a",false)
+                                                if(root.showPath && !root.showPathAge)for(var path of (layers.path||[]))line(path.points,path.kind==="mop_path"?"#55ccee":"#f2d77a",false)
                                                 if(root.showRestrictions)for(var area of (layers.restrictions||[]))line(area.points,"#ff7676",area.points.length>2)
                                                 if(root.showObstacles)for(var obstacle of (layers.obstacles||[])){ctx.beginPath();ctx.arc(obstacle[0]*sx,obstacle[1]*sy,4,0,Math.PI*2);ctx.fillStyle="#ff9944";ctx.fill()}
-                                                var all=root.zones.slice();if(root.draft)all.push(root.draft)
+                                                var all=root.zones.slice();if(root.draft){if(mapPointer.resize>=0)all[mapPointer.resize]=root.draft;else all.push(root.draft)}
                                                 ctx.strokeStyle=Color.accent;ctx.lineWidth=2;ctx.fillStyle=Qt.rgba(Color.accent.r,Color.accent.g,Color.accent.b,0.22)
-                                                for(var z of all){var x=Math.min(z[0],z[2])*sx,y=Math.min(z[1],z[3])*sy,w=Math.abs(z[2]-z[0])*sx,h=Math.abs(z[3]-z[1])*sy;ctx.fillRect(x,y,w,h);ctx.strokeRect(x,y,w,h)}
+                                                for(var zi=0;zi<all.length;zi++){var z=all[zi];var x=Math.min(z[0],z[2])*sx,y=Math.min(z[1],z[3])*sy,w=Math.abs(z[2]-z[0])*sx,h=Math.abs(z[3]-z[1])*sy;ctx.fillRect(x,y,w,h);ctx.strokeStyle=zi===root.selectedZone?"#ffffff":Color.accent;ctx.strokeRect(x,y,w,h)
+                                                    if(zi===root.selectedZone && root.scope===2 && !root.panMode){var r=6/mapViewport.zoom;ctx.fillStyle="#ffffff";for(var xx of [x,x+w])for(var yy of [y,y+h])ctx.fillRect(xx-r,yy-r,2*r,2*r);ctx.fillStyle=Qt.rgba(Color.accent.r,Color.accent.g,Color.accent.b,0.22)}
+                                                }
                                             }
                                         }
                                         Repeater {
@@ -326,30 +344,77 @@ Ui.Panel {
                                             }
                                         }
                                         MouseArea {
+                                            id: mapPointer
                                             anchors.fill:parent
                                             enabled:mapImage.status===Image.Ready
                                             acceptedButtons:Qt.LeftButton | Qt.RightButton
                                             property var panStart:null
+                                            property bool panned:false
+                                            property int resize:-1
+                                            property var opposite:null
+                                            preventStealing: true
                                             onWheel:function(wheel){mapViewport.zoom=Math.max(1,Math.min(5,mapViewport.zoom*(wheel.angleDelta.y>0?1.2:1/1.2)));wheel.accepted=true}
                                             onClicked:function(mouse){
-                                                if(mouse.button!==Qt.LeftButton || root.scope!==0)return
+                                                if(mouse.button!==Qt.LeftButton || root.scope!==0 || panned || root.panMode)return
                                                 var a=p(mouse)
                                                 var id=RoomGeometry.roomAt(root.floorMap.roomMaskPixels,root.current.rooms,a[0],a[1])
                                                 if(id!==null)root.chooseRoom(id)
                                             }
                                             cursorShape:Qt.CrossCursor
                                             function p(mouse){return [Math.max(0,Math.min(mapImage.sourceSize.width,mouse.x/width*mapImage.sourceSize.width)),Math.max(0,Math.min(mapImage.sourceSize.height,mouse.y/height*mapImage.sourceSize.height))]}
-                                            onPressed:function(mouse){if(mouse.button===Qt.RightButton){var v=mapToItem(mapViewport,mouse.x,mouse.y);panStart=[v.x,v.y,mapViewport.panX,mapViewport.panY];return};if(root.scope!==2 || !root.activeFloor)return;if(root.zones.length>=5){root.actionMessage="Maximum five zones";return};var a=p(mouse);root.draft=[a[0],a[1],a[0],a[1]];mapCanvas.requestPaint()}
-                                            onPositionChanged:function(mouse){if(panStart){var v=mapToItem(mapViewport,mouse.x,mouse.y);mapViewport.panX=panStart[2]+v.x-panStart[0];mapViewport.panY=panStart[3]+v.y-panStart[1];return};if(root.draft){var a=p(mouse);root.draft=[root.draft[0],root.draft[1],a[0],a[1]];mapCanvas.requestPaint()}}
-                                            onReleased:{panStart=null;if(root.draft && Math.abs(root.draft[2]-root.draft[0])>5 && Math.abs(root.draft[3]-root.draft[1])>5)root.zones=root.zones.concat([root.draft]);root.draft=null;mapCanvas.requestPaint()}
-                                            onCanceled:{panStart=null;root.draft=null;mapCanvas.requestPaint()}
+                                            onPressed:function(mouse){
+                                                panned=false
+                                                if(mouse.button===Qt.RightButton || root.panMode || root.scope!==2){
+                                                    var v=mapToItem(mapViewport,mouse.x,mouse.y);panStart=[v.x,v.y,mapViewport.panX,mapViewport.panY];return
+                                                }
+                                                if(!root.activeFloor)return
+                                                var a=p(mouse), z=root.zones[root.selectedZone]
+                                                if(z){
+                                                    var tx=14*mapImage.sourceSize.width/(width*mapViewport.zoom)
+                                                    var ty=14*mapImage.sourceSize.height/(height*mapViewport.zoom)
+                                                    for(var xi of [0,2])for(var yi of [1,3]){
+                                                        if(Math.abs(a[0]-z[xi])<=tx && Math.abs(a[1]-z[yi])<=ty){
+                                                            resize=root.selectedZone;opposite=[z[2-xi],z[4-yi]];root.draft=z.slice();return
+                                                        }
+                                                    }
+                                                }
+                                                for(var i=root.zones.length-1;i>=0;i--){
+                                                    z=root.zones[i]
+                                                    if(a[0]>=Math.min(z[0],z[2]) && a[0]<=Math.max(z[0],z[2]) && a[1]>=Math.min(z[1],z[3]) && a[1]<=Math.max(z[1],z[3])){
+                                                        root.selectedZone=i;mapCanvas.requestPaint();return
+                                                    }
+                                                }
+                                                if(root.zones.length>=5){root.actionMessage="Maximum five zones";return}
+                                                root.selectedZone=-1;root.draft=[a[0],a[1],a[0],a[1]];mapCanvas.requestPaint()
+                                            }
+                                            onPositionChanged:function(mouse){
+                                                if(panStart){
+                                                    var v=mapToItem(mapViewport,mouse.x,mouse.y),dx=v.x-panStart[0],dy=v.y-panStart[1]
+                                                    if(!panned && Math.hypot(dx,dy)<6)return
+                                                    panned=true;mapViewport.panX=panStart[2]+dx;mapViewport.panY=panStart[3]+dy;return
+                                                }
+                                                if(root.draft){var a=p(mouse),anchor=opposite||root.draft;root.draft=[anchor[0],anchor[1],a[0],a[1]];mapCanvas.requestPaint()}
+                                            }
+                                            onReleased:{
+                                                if(root.activeFloor && root.scope===2 && root.draft && Math.abs(root.draft[2]-root.draft[0])>5 && Math.abs(root.draft[3]-root.draft[1])>5){
+                                                    var updated=root.zones.slice(), index=resize>=0?resize:updated.length
+                                                    updated[index]=root.draft;root.zones=updated;root.selectedZone=index
+                                                }
+                                                panStart=null;resize=-1;opposite=null;root.draft=null;mapCanvas.requestPaint()
+                                            }
+                                            onCanceled:{panStart=null;resize=-1;opposite=null;root.draft=null;mapCanvas.requestPaint()}
                                         }
                                     }
                                 }
-                                Row {
-                                    width:parent.width
-                                    Text {width:parent.width-110;text:root.floorMap.mapAt?"Map captured "+new Date(root.floorMap.mapAt).toLocaleTimeString(Qt.locale("en_GB"),"HH:mm"):"Robot-reported map";color:root.muted;font.family:Style.font.family;font.pixelSize:10}
-                                    RockButton {text:"Clear zones";onClicked:{root.zones=[];mapCanvas.requestPaint()}}
+                                Flow {
+                                    width:parent.width;spacing:6
+                                    visible:root.scope===2
+                                    Repeater {
+                                        model:root.zones.length
+                                        RockButton {required property int index;text:"Zone "+(index+1);selected:root.selectedZone===index;onClicked:{root.selectedZone=index;mapCanvas.requestPaint()}}
+                                    }
+                                    RockButton {text:"Delete selected zone";available:root.selectedZone>=0;onClicked:{var updated=root.zones.slice();updated.splice(root.selectedZone,1);root.selectedZone=-1;root.zones=updated;mapCanvas.requestPaint()}}
+                                    RockButton {text:"Clear zones";available:root.zones.length>0;onClicked:{root.zones=[];mapCanvas.requestPaint()}}
                                 }
                                 Flow {
                                     width:parent.width;spacing:6
@@ -358,13 +423,12 @@ Ui.Panel {
                                     RockButton {text:"Fit · "+Math.round(mapViewport.zoom*100)+"%";onClicked:mapViewport.fit()}
                                     RockButton {text:"Centre robot";available:!!(root.floorMap.layers||{}).robot;onClicked:mapViewport.centreRobot()}
                                 }
-                                Text {width:parent.width;text:"+/− or wheel/pinch: zoom · F: fit · B: robot · Ctrl+arrows/right-drag: pan · tap room cells or labels to select";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
+                                Text {width:parent.width;text:"+/− or wheel/pinch: zoom · F: fit · B: robot · drag to pan (use Pan map in Zone mode) · tap a zone, then drag a white corner to resize";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                                 Flow {
                                     width:parent.width;spacing:6
                                     RockButton {text:"Activity age · T";available:root.hasRoomMask;selected:root.showActivityAge;onClicked:{root.showActivityAge=!root.showActivityAge;mapCanvas.requestPaint()}}
                                     RockButton {text:"Floorplan · P";available:root.hasRoomMask;selected:root.floorplanActive;onClicked:{root.floorplanView=!root.floorplanView;mapCanvas.requestPaint()}}
                                     RockButton {text:"Room geometry · G";available:!!root.floorMap.roomMaskPixels;selected:root.showRoomGeometry;onClicked:{root.showRoomGeometry=!root.showRoomGeometry;mapCanvas.requestPaint()}}
-                                    RockButton {text:"Path age";available:!!((root.report.pathHeatmaps||{})[String(root.floor)]||{}).available;selected:root.showPathAge;onClicked:{root.showPathAge=!root.showPathAge;mapCanvas.requestPaint()}}
                                     RockButton {text:"Path";available:!!root.floorMap.layers && root.floorMap.layers.path.length>0;selected:root.showPath;onClicked:{root.showPath=!root.showPath;mapCanvas.requestPaint()}}
                                     RockButton {text:"Obstacles";available:!!root.floorMap.layers && root.floorMap.layers.obstacles.length>0;selected:root.showObstacles;onClicked:{root.showObstacles=!root.showObstacles;mapCanvas.requestPaint()}}
                                     RockButton {text:"Restrictions";available:!!root.floorMap.layers && root.floorMap.layers.restrictions.length>0;selected:root.showRestrictions;onClicked:{root.showRestrictions=!root.showRestrictions;mapCanvas.requestPaint()}}
@@ -398,7 +462,7 @@ Ui.Panel {
                                     Repeater {model:3;RockButton {required property int index;text:String(index+1);selected:root.passes===index+1;available:root.scope!==1 || index===0;onClicked:root.passes=index+1}}
                                 }
                                 Text {width:parent.width;text:root.scope===0?root.selected.length+" room(s) selected":root.scope===1?"Whole "+root.current.name:root.zones.length+" zone(s) · drag on map";color:root.muted;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap}
-                                RockButton {width:parent.width;text:"Review cleaning request →";primary:true;available:root.activeFloor;onClicked:root.review()}
+                                RockButton {width:parent.width;text:"Review cleaning request →";primary:true;available:root.activeFloor;onClicked:{root.review();if(root.pending)root.actionMessage="Review ready below. Use Open pending review or scroll down."}}
                                 Row {spacing:8;RockButton {text:"Ⅱ Pause";onClicked:{root.pending={action:"pause"};root.actionMessage=""}} RockButton {text:"⌂ Dock";onClicked:{root.pending={action:"dock"};root.actionMessage=""}}}
                                 Text {width:parent.width;text:root.report.controlsEnabled?"Supervise first cleaning tests.":"Controls locked. Preview only; no commands sent.";color:root.muted;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}
                             }

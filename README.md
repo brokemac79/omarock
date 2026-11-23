@@ -1,6 +1,6 @@
 # OmaRock
 
-**A native Roborock plugin for Omarchy.** The bar widget and application launcher open a separate, resizable, theme-aware native QML app window hosted by Omarchy’s Quickshell process. **No browser, WebView or web server.** Independent community project, not affiliated with Roborock. MIT licensed; private early-alpha development.
+**A native Roborock plugin for Omarchy.** The bar widget and application launcher open a separate, resizable, theme-aware native QML app window hosted by Omarchy’s Quickshell process. **No browser, WebView or web server.** Independent community project, not affiliated with Roborock. MIT licensed; early alpha. Start in read-only mode.
 
 ## Features
 
@@ -20,10 +20,11 @@ omarchy plugin add https://github.com/brokemac79/omarock.git
 uv venv --python 3.12 ~/.local/share/omarock/venv
 uv pip install --python ~/.local/share/omarock/venv/bin/python 'python-roborock[cli]==7.23.2'
 omarchy plugin enable io.github.brokemac79.omarock
+mkdir -p ~/.local/share/applications
 cp ~/.config/omarchy/plugins/io.github.brokemac79.omarock/omarock.desktop ~/.local/share/applications/
 ```
 
-Private repo access needs GitHub authentication. Click the robot bar icon or launch **OmaRock** from the application launcher to open the app window. Middle-click or press R in the panel to refresh; Escape closes the review or app window. The Python environment MUST live outside the plugin tree (Omarchy disallows internal symlinks). No auto-start daemon or listening port is installed.
+While the repository is private, GitHub authentication is required. No credentials or configuration from the developer are needed. Click the robot bar icon or launch **OmaRock** from the application launcher to open the app window. Middle-click or press R in the panel to refresh; Escape closes the review or app window. The Python environment MUST live outside the plugin tree (Omarchy disallows internal symlinks). No auto-start daemon or listening port is installed.
 
 ## Account and private data
 
@@ -33,7 +34,7 @@ Email-code login uses the vendor library’s credential cache in `~/.roborock`. 
 
 ## Safety / commissioning
 
-Live Saros 20 actuation is **not physically verified**. Leave the default lock on until a supervised test. To explicitly commission, set `{"allow_control": true}` in the private config above and refresh the panel. The default is false. No configuration file or token is shipped in the repo.
+A short, supervised room-vacuum run verified path capture on one Saros 20. That does not commission all robot controls or models. Leave the default lock on until your own supervised test. To explicitly commission, set `{"allow_control": true}` in the private config above and refresh the panel. The default is false. No configuration file or token is shipped in the repo.
 
 Cleaning requires confirming the robot’s physical floor, valid current map and room IDs, battery >=20%, no reported errors and no active cleaning/returning task. The plugin does not switch maps automatically. Move the robot and select its floor using the official app first. Whole-floor repeats are not implemented; select rooms for repeats.
 
@@ -41,7 +42,9 @@ A request is **submitted**, never assumed complete. Mode setting and starting ar
 
 ## Honest limitations
 
-Only the active floor’s image is available; other saved floor names/rooms can be browsed without pretending their image is current. History may omit room IDs. No fabricated last-cleaned room dates or freshness layer. Maps use real robot-rendered data, not the illustrative furniture from the design concept. The app launcher and bar open/focus the same independent native window. It remains open when it loses focus and can be tiled or moved to another workspace. Narrow compositor-forced tiles scroll horizontally instead of overlapping controls. No browser or WebView.
+Other floors can display cached images after an explicit idle import; browsing those images does not switch the robot. Under Overview, use **Path age** above the map to see the age of captured path cells. It shows where the robot passed, not swept area, cleaning mode or room completion. Missing history remains unknown. Use pinch or +/− to zoom; in Zone mode select a draft zone to resize or delete it. The scrollbar is on the right.
+
+Only the tested Omarchy/Quickshell setup is currently supported. The optional scheduler units are not installed or enabled by the plugin. Report issues with redacted logs only; do not attach snapshots, floor maps, or credential files.
 
 ## Development
 

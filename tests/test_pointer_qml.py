@@ -29,6 +29,8 @@ Item {
  property int scope: 0
  property bool activeFloor: true
  property var zones: []
+ property int selectedZone: -1
+ property bool panMode: false
  property var draft: null
  property string actionMessage: ""
  property int selectedRoom: -1
@@ -58,7 +60,7 @@ Item {
   name:"ProductionMapPointer"
   when:windowShown
   function init() {
-   root.scope=0;root.activeFloor=true;root.zones=[];root.draft=null;root.selectedRoom=-1
+   root.scope=0;root.activeFloor=true;root.zones=[];root.selectedZone=-1;root.draft=null;root.selectedRoom=-1
    mapViewport.zoom=1;mapViewport.panX=0;mapViewport.panY=0
   }
   function point(x,y) {return plane.mapToItem(root,x/2,y/2)}
@@ -90,6 +92,17 @@ Item {
    var a=point(150,90),b=point(250,150)
    mousePress(root,a.x,a.y,Qt.LeftButton);mouseMove(root,b.x,b.y,20);mouseRelease(root,b.x,b.y,Qt.LeftButton)
    compare(root.zones.length,0)
+  }
+  function test_select_and_resize_one_zone() {
+   root.scope=2;root.zones=[[150,90,250,150],[300,100,400,190]]
+   var p=point(340,145)
+   mouseClick(root,p.x,p.y,Qt.LeftButton)
+   compare(root.selectedZone,1)
+   var a=point(400,190),b=point(450,230)
+   mousePress(root,a.x,a.y,Qt.LeftButton);mouseMove(root,b.x,b.y,20);mouseRelease(root,b.x,b.y,Qt.LeftButton)
+   compare(root.zones.length,2)
+   compare(root.zones[0],[150,90,250,150])
+   compare(root.zones[1],[300,100,450,230])
   }
   function test_right_drag_pan() {
    mapViewport.zoom=1.5625
