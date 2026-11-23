@@ -1,5 +1,6 @@
 """Desktop weekly scheduler: local time, at-most-once dispatch, no missed-job catch-up."""
 import datetime as dt
+import re
 from zoneinfo import ZoneInfo
 
 def validate(request,maps,controls=False):
@@ -11,6 +12,15 @@ def validate(request,maps,controls=False):
     enabled=request.get('enabled') is True
     if enabled and (not controls or request.get('confirmed') is not True): raise ValueError('Automatic control locked: supervised commissioning and explicit confirmation required')
     return {k:p[k] for k in ('floor','room','mode')}|{'hour':hour,'minute':minute,'weekdays':sorted(set(weekdays)),'timezone':'Europe/London','enabled':enabled}
+
+def valid_target(target):
+    return isinstance(target, str) and re.fullmatch(r'v1:[0-9a-f]{64}', target) is not None
+
+
+def require_target(expected, actual):
+    if not valid_target(expected) or expected != actual:
+        raise ValueError('Schedule target changed or is unconfirmed; refresh and recreate the schedule')
+
 
 def slot(schedule,clock):
     local=clock.astimezone(ZoneInfo(schedule['timezone']))

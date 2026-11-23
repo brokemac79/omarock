@@ -28,3 +28,36 @@ class SchedulerTests(unittest.IsolatedAsyncioTestCase):
         s=scheduler.validate(self.plan(hour=1,weekdays=[6],enabled=True,confirmed=True),self.maps,True)
         a=dt.datetime(2026,10,25,0,30,tzinfo=dt.timezone.utc)
         self.assertEqual(scheduler.slot(s,a),scheduler.slot(s,a+dt.timedelta(hours=1)))
+
+class ScheduleTargetTests(unittest.IsolatedAsyncioTestCase):
+    async def test_only_confirmed_target_can_execute(self):
+        from unittest.mock import Mock, patch
+        from omarock import perform, schedule_target
+
+        target = schedule_target('account-a', 'robot-a')
+        for expected, actual in [
+            (None, target),
+            ('invalid', target),
+            (target, None),
+            (target, schedule_target('account-b', 'robot-a')),
+            (target, schedule_target('account-a', 'robot-b')),
+        ]:
+            with self.subTest(expected=expected, actual=actual):
+                robot = Mock(schedule_target=actual, connect=AsyncMock(),
+                             execute=AsyncMock(), close=AsyncMock())
+                with patch('omarock.Robot', return_value=robot):
+                    with self.assertRaisesRegex(ValueError, 'target changed or is unconfirmed'):
+                        await perform('clean', scheduled=True, expected_schedule_target=expected)
+                robot.execute.assert_not_awaited()
+                robot.close.assert_awaited_once()
+
+        robot = Mock(schedule_target=target, connect=AsyncMock(),
+                     execute=AsyncMock(), close=AsyncMock())
+        with patch('omarock.Robot', return_value=robot):
+            await perform('clean', scheduled=True, expected_schedule_target=target, plan={})
+        robot.execute.assert_awaited_once_with('clean', plan={})
+
+    def test_target_rejects_missing_identity(self):
+        from omarock import schedule_target
+        self.assertIsNone(schedule_target(None, 'robot'))
+        self.assertIsNone(schedule_target('account', ' '))

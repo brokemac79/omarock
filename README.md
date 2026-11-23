@@ -86,6 +86,11 @@ jobs can be saved before commissioning. Enabling requires explicit physical-floo
 confirmation and the existing private allow_control safety gate; this release
 does not unlock untested cleaning controls.
 
+Enabled schedules are bound to the Roborock account and selected robot at confirmation.
+Refresh the robot status before saving an enabled schedule. Old unbound jobs and
+jobs for another account or robot cannot dispatch. Delete and recreate a job
+with explicit confirmation to schedule it for a different target.
+
 The systemd user timer in deploy checks once per minute. Surface must be awake,
 signed in and online: these are **not Roborock cloud/device timers**. Missed jobs
 are skipped (no surprise catch-up). No map switching. Current map, battery, errors

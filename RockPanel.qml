@@ -583,7 +583,7 @@ Ui.Panel {
                             }
                         }
                     }
-                    TimedSchedules {width:parent.width;visible:root.tab===5;python:root.python;base:root.base;maps:root.maps}
+                    TimedSchedules {width:parent.width;visible:root.tab===5;python:root.python;base:root.base;maps:root.maps;scheduleTarget:root.report.scheduleTarget || "";robotName:root.report.name || ""}
                     SchedulePane {
                         id: schedule
                         width:parent.width

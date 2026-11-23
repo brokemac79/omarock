@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import base64
 import datetime as dt
+import hashlib
 import json
 import math
 import os
@@ -84,6 +85,8 @@ class Robot:
             device = devices[0]
         else: raise ValueError('Set device_id in ~/.config/omarock/config.json; multiple or no devices found')
         if not device.v1_properties: raise ValueError('Only Roborock V1 devices are supported in this alpha')
+        account = getattr(self.context.connection_cache().user_data.rriot, "u", None)
+        self.schedule_target = schedule_target(account, device.duid)
         self.name = device.name
         self.v = device.v1_properties
         await self.v.start()
@@ -92,7 +95,7 @@ class Robot:
     async def snapshot(self, include_map=False):
         await self.v.status.refresh()
         s=self.v.status
-        result={'at':now(),'name':self.name,'demo':False,'battery':s.battery,'state':enum_name(s.state),
+        result={'at':now(),'name':self.name,'demo':False,'scheduleTarget':getattr(self,'schedule_target',None),'battery':s.battery,'state':enum_name(s.state),
                 'activeFloor':s.current_map,'robotError':enum_name(s.error_code),'dockError':enum_name(s.dock_error_status),
                 'cleanWater':enum_name(s.clear_water_box_status),'dirtyWater':enum_name(s.dirty_water_box_status),
                 'washing':s.wash_status,'drying':s.dry_status,'drySeconds':s.rdt,
@@ -345,10 +348,21 @@ class Robot:
         with open(STATE/'requests.jsonl','a') as f: f.write(json.dumps({'at':now(),'plan':plan,'result':'submitted, completion unverified'})+'\n')
         return response
 
-async def perform(operation, **kwargs):
+def schedule_target(account, device):
+    if any(not isinstance(value, str) or not value.strip() for value in (account, device)):
+        return None
+    target = json.dumps([account, device], ensure_ascii=True).encode()
+    return 'v1:' + hashlib.sha256(b'OmaRock schedule target v1:' + target).hexdigest()
+
+
+async def perform(operation, *, expected_schedule_target=None, scheduled=False, **kwargs):
     robot=Robot()
     try:
         await robot.connect()
+        if scheduled:
+            import scheduler
+            scheduler.require_target(expected_schedule_target, robot.schedule_target)
+        if operation=='schedule-target': return robot.schedule_target
         if operation=='snapshot': return await robot.snapshot(**kwargs)
         if operation=='import-maps': return await robot.import_maps()
         return await robot.execute(operation,**kwargs)
@@ -479,12 +493,22 @@ def main():
                 snapshot=load(STATE/'snapshot.json',{})
                 config=load(CONFIG/'config.json',{})
                 value=scheduler.validate(request,snapshot.get('maps',[]),config.get('allow_control') is True)
+                if value['enabled']:
+                    expected = request.get('scheduleTarget')
+                    scheduler.require_target(expected, snapshot.get('scheduleTarget'))
+                    actual = asyncio.run(perform('schedule-target'))
+                    scheduler.require_target(expected, actual)
+                    value['target'] = actual
                 schedules[uuid.uuid4().hex]=value
                 save(STATE/'schedules.json',schedules)
             elif args.command=='delete-schedule':
                 schedules.pop(request.get('id'),None)
                 save(STATE/'schedules.json',schedules)
-            result={'schedules':[dict(v,id=k) for k,v in schedules.items()],'controlsEnabled':load(CONFIG/'config.json',{}).get('allow_control') is True,'outcomes':list(load(STATE/'schedule-journal.json',{}).values())[-10:]}
+            current = load(STATE/'snapshot.json',{}).get('scheduleTarget')
+            result={'schedules':[dict({key: val for key,val in v.items() if key!='target'},id=k,
+                                      needsConfirmation=v.get('enabled') is True and
+                                      (not scheduler.valid_target(current) or v.get('target') != current))
+                                 for k,v in schedules.items()],'controlsEnabled':load(CONFIG/'config.json',{}).get('allow_control') is True,'outcomes':list(load(STATE/'schedule-journal.json',{}).values())[-10:]}
         elif args.command=='scheduler-tick':
             import scheduler
             journal=load(STATE/'schedule-journal.json',{})
@@ -492,7 +516,10 @@ def main():
                 plan={'floor':schedule['floor'],'confirmedFloor':schedule['floor'],'mode':schedule['mode'],'passes':1,'scope':'floor' if schedule['room'] is None else 'rooms','rooms':[] if schedule['room'] is None else [schedule['room']]}
                 # execute rechecks current map, busy, battery, errors and control lock.
                 # Never switches floor maps or wakes a sleeping desktop.
-                return await perform('clean',plan=plan)
+                target = schedule.get('target')
+                if not scheduler.valid_target(target):
+                    raise ValueError('Unbound schedule; recreate and confirm it before enabling')
+                return await perform('clean',plan=plan,scheduled=True,expected_schedule_target=target)
             result={'outcomes':asyncio.run(scheduler.tick(load(STATE/'schedules.json',{}),journal,dt.datetime.now(dt.timezone.utc),dispatch,lambda j:save(STATE/'schedule-journal.json',j)))}
         elif args.command=='import-maps':
             if json.loads(args.request).get('confirmed') is not True: raise ValueError('Explicit map-import confirmation required')

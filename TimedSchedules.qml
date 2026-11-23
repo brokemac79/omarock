@@ -6,6 +6,9 @@ Column {
     property string python
     property string base
     property var maps: []
+    property string scheduleTarget: ""
+    property string robotName: ""
+    onScheduleTargetChanged: { enableJob=false; floor=maps.length?maps[0].id:-1; room=null; if(visible)reload() }
     property var jobs: []
     property var outcomes: []
     property int floor: maps.length?maps[0].id:-1
@@ -30,12 +33,12 @@ Column {
     Row {spacing:8;RockButton {text:"Hour −";onClicked:root.hour=(root.hour+23)%24} Text {text:String(root.hour).padStart(2,"0")+":"+String(root.minute).padStart(2,"0");color:Color.foreground;font.family:Style.font.family;font.pixelSize:18;anchors.verticalCenter:parent.verticalCenter} RockButton {text:"Hour +";onClicked:root.hour=(root.hour+1)%24} RockButton {text:"Min −";onClicked:root.minute=(root.minute+55)%60} RockButton {text:"Min +";onClicked:root.minute=(root.minute+5)%60}}
     Row {spacing:5;Repeater {model:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];RockButton {required property string modelData;required property int index;text:modelData;selected:root.weekdays.indexOf(index)>=0;onClicked:{var d=root.weekdays.slice();var n=d.indexOf(index);if(n<0)d.push(index);else d.splice(n,1);root.weekdays=d}}}}
     Text {width:parent.width;text:root.controlsEnabled?"Before enabling: leave the robot physically on the selected floor with that map active. A job operates the robot automatically at the chosen time.":"Automatic starts are locked until supervised cleaning controls are commissioned. You can save disabled schedules now.";color:Color.accent;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap}
-    RockButton {text:(root.enableJob?"✓ ":"□ ")+"Enable automatic cleaning; robot will be on this floor";available:root.controlsEnabled;selected:root.enableJob;onClicked:root.enableJob=!root.enableJob}
-    Row {spacing:8;RockButton {text:"Save schedule";primary:true;available:!writer.running && root.weekdays.length>0;onClicked:{writer.command=[root.python,root.base+"/omarock.py","save-schedule","--request",JSON.stringify({floor:root.floor,room:root.room,mode:root.mode,hour:root.hour,minute:root.minute,weekdays:root.weekdays,enabled:root.enableJob,confirmed:root.enableJob})];writer.running=true}} RockButton {text:"Reload";onClicked:root.reload()}}
+    RockButton {text:(root.enableJob?"✓ ":"□ ")+"Enable automatic cleaning for "+root.robotName+"; robot will be on this floor";available:root.controlsEnabled && root.scheduleTarget.length>0;selected:root.enableJob;onClicked:root.enableJob=!root.enableJob}
+    Row {spacing:8;RockButton {text:"Save schedule";primary:true;available:!writer.running && root.weekdays.length>0;onClicked:{writer.command=[root.python,root.base+"/omarock.py","save-schedule","--request",JSON.stringify({floor:root.floor,room:root.room,mode:root.mode,hour:root.hour,minute:root.minute,weekdays:root.weekdays,enabled:root.enableJob,confirmed:root.enableJob,scheduleTarget:root.scheduleTarget})];writer.running=true}} RockButton {text:"Reload";onClicked:root.reload()}}
     Text {text:root.message;color:Color.accent;font.family:Style.font.family;font.pixelSize:11}
     Repeater {model:root.outcomes;Text {required property var modelData;width:root.width;text:modelData.at+" · "+modelData.status;color:Color.accent;font.family:Style.font.family;font.pixelSize:10;wrapMode:Text.WordWrap}}
     Repeater {model:root.jobs;Row {required property var modelData;spacing:8
-        Text {width:root.width-100;text:(modelData.enabled?"ENABLED":"DISABLED")+" · "+(root.maps.find(function(m){return m.id===modelData.floor})||{}).name+" · "+(modelData.room===null?"whole floor":"room "+modelData.room)+" · "+modelData.mode+" · "+String(modelData.hour).padStart(2,"0")+":"+String(modelData.minute).padStart(2,"0")+" · "+modelData.weekdays.map(function(d){return ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][d]}).join(", ");color:Color.foreground;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap}
+        Text {width:root.width-100;text:(modelData.needsConfirmation?"RECREATE TO CONFIRM":(modelData.enabled?"ENABLED":"DISABLED"))+" · "+(root.maps.find(function(m){return m.id===modelData.floor})||{}).name+" · "+(modelData.room===null?"whole floor":"room "+modelData.room)+" · "+modelData.mode+" · "+String(modelData.hour).padStart(2,"0")+":"+String(modelData.minute).padStart(2,"0")+" · "+modelData.weekdays.map(function(d){return ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][d]}).join(", ");color:Color.foreground;font.family:Style.font.family;font.pixelSize:11;wrapMode:Text.WordWrap}
         RockButton {text:"Delete";available:!writer.running;onClicked:{writer.command=[root.python,root.base+"/omarock.py","delete-schedule","--request",JSON.stringify({id:modelData.id})];writer.running=true}}
     }}
 }
