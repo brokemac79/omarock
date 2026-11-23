@@ -24,7 +24,11 @@ mkdir -p ~/.local/share/applications
 cp ~/.config/omarchy/plugins/io.github.brokemac79.omarock/omarock.desktop ~/.local/share/applications/
 ```
 
-While the repository is private, GitHub authentication is required. No credentials or configuration from the developer are needed. Click the robot bar icon or launch **OmaRock** from the application launcher to open the app window. Middle-click or press R in the panel to refresh; Escape closes the review or app window. The Python environment MUST live outside the plugin tree (Omarchy disallows internal symlinks). No auto-start daemon or listening port is installed.
+No credentials or configuration from the developer are needed. Click the robot bar icon or launch **OmaRock** from the application launcher to open the app window. Middle-click or press R in the panel to refresh; Escape closes the review or app window. The Python environment MUST live outside the plugin tree (Omarchy disallows internal symlinks). No auto-start daemon or listening port is installed.
+
+## Remove
+
+Run `omarchy plugin remove io.github.brokemac79.omarock`. If you copied the desktop launcher, remove `~/.local/share/applications/omarock.desktop` as well. If you manually enabled the optional scheduler, disable and stop its user timer before removing the plugin. The Python environment, configuration and local map/history cache are separate; you can retain them for a reinstall or move the OmaRock directories under `~/.local/share`, `~/.config` and `~/.local/state` to a private backup. The vendor credential cache (`~/.roborock`) may be shared with other Roborock tools and is not removed by the plugin manager.
 
 ## Account and private data
 
